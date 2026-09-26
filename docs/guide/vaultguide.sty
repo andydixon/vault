@@ -75,8 +75,7 @@
 \newcommand\file[1]{\leavevmode{\ttfamily\color{vskydeep}#1}}
 \newcommand\hl[1]{\leavevmode{\semibold\color{vink}#1}}
 \newcommand\keycap[1]{\tikz[baseline=(k.base)]\node[draw=vline,fill=white,rounded corners=2pt,
-  inner xsep=4pt,inner ysep=2pt,font=\footnotesize\semibold,
-  blur shadow={shadow xshift=0pt,shadow yshift=-0.6pt,shadow blur steps=3,shadow opacity=25}](k){#1};}
+  inner xsep=4pt,inner ysep=2pt,font=\footnotesize\semibold,drop shadow={shadow xshift=0pt,shadow yshift=-0.6pt,fill=black,opacity=.25}](k){#1};}
 \newcommand\pill[2][vteal]{\tikz[baseline=(p.base)]\node[fill=#1!14,text=#1!70!black,rounded corners=5pt,
   inner xsep=5pt,inner ysep=2pt,font=\scriptsize\labelfont](p){#2};}
 \newcommand\stepdot[1]{\tikz[baseline=(c.base)]\node[circle,fill=vteal,text=white,
