@@ -1,0 +1,293 @@
+% vaultguide.sty — the look of the vault field guide.
+% Compiled with Tectonic (XeTeX). All fonts come from the TeX bundle.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{vaultguide}
+
+\PassOptionsToPackage{table}{xcolor}
+\RequirePackage[a4paper,top=27mm,bottom=26mm,left=26mm,right=26mm,
+  headheight=16pt,headsep=9mm,footskip=13mm]{geometry}
+\RequirePackage{fontspec}
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\usetikzlibrary{calc,positioning,arrows.meta,shadows.blur,backgrounds,fit,shapes.misc}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{fontawesome5}
+\RequirePackage{graphicx}
+\RequirePackage{titlesec}
+\RequirePackage{titletoc}
+\RequirePackage{fancyhdr}
+\RequirePackage{enumitem}
+\RequirePackage{booktabs,tabularx,array}
+\RequirePackage{listings}
+\RequirePackage{xstring}
+\RequirePackage{microtype}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{bookmark}
+
+% ---------------------------------------------------------------- colours
+\definecolor{vnavy}{HTML}{0B1020}
+\definecolor{vink}{HTML}{1A2244}
+\definecolor{vteal}{HTML}{19C3A6}
+\definecolor{vtealdeep}{HTML}{0B8C77}
+\definecolor{vamber}{HTML}{FFB020}
+\definecolor{vamberdeep}{HTML}{B87400}
+\definecolor{vcoral}{HTML}{FF5D73}
+\definecolor{vcoraldeep}{HTML}{C8243E}
+\definecolor{vviolet}{HTML}{7C5CFF}
+\definecolor{vvioletdeep}{HTML}{5337D6}
+\definecolor{vsky}{HTML}{4F8CFF}
+\definecolor{vskydeep}{HTML}{2A62D6}
+\definecolor{vgreen}{HTML}{2BB673}
+\definecolor{vgreendeep}{HTML}{178453}
+\definecolor{vmist}{HTML}{F2F5FB}
+\definecolor{vline}{HTML}{DCE3F0}
+\definecolor{vslate}{HTML}{5B6788}
+\definecolor{vtext}{HTML}{1E2433}
+
+% ---------------------------------------------------------------- fonts
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{Inter-Regular.otf}[
+  BoldFont=Inter-Bold.otf, ItalicFont=Inter-Italic.otf,
+  BoldItalicFont=Inter-BoldItalic.otf]
+\setmonofont{FiraMono-Regular.otf}[BoldFont=FiraMono-Bold.otf, Scale=0.92]
+\newfontfamily\semibold{Inter-SemiBold.otf}
+\newfontfamily\lightfont{Inter-Light.otf}[ItalicFont=Inter-Italic.otf]
+\newfontfamily\display{Montserrat-ExtraBold.otf}
+\newfontfamily\displayblack{Montserrat-Black.otf}
+\newfontfamily\displaybold{Montserrat-Bold.otf}
+\newfontfamily\displaysemi{Montserrat-SemiBold.otf}
+\newfontfamily\displaylight{Montserrat-Light.otf}
+\newfontfamily\displaythin{Montserrat-Thin.otf}
+\newfontfamily\labelfont{Montserrat-Bold.otf}[LetterSpace=14]
+\newfontfamily\labelfontwide{Montserrat-SemiBold.otf}[LetterSpace=30]
+
+\color{vtext}
+\linespread{1.14}
+\setlength\parindent{0pt}
+\setlength\parskip{0.62em plus 0.15em minus 0.05em}
+\setlength\emergencystretch{2em}
+\raggedbottom
+
+% ---------------------------------------------------------------- small helpers
+\newcommand\cmd[1]{\leavevmode{\ttfamily\color{vtealdeep}#1}}
+\newcommand\tld{\textasciitilde}
+\newcommand\env[1]{\leavevmode{\ttfamily\color{vvioletdeep}#1}}
+\newcommand\file[1]{\leavevmode{\ttfamily\color{vskydeep}#1}}
+\newcommand\hl[1]{\leavevmode{\semibold\color{vink}#1}}
+\newcommand\keycap[1]{\tikz[baseline=(k.base)]\node[draw=vline,fill=white,rounded corners=2pt,
+  inner xsep=4pt,inner ysep=2pt,font=\footnotesize\semibold,
+  blur shadow={shadow xshift=0pt,shadow yshift=-0.6pt,shadow blur steps=3,shadow opacity=25}](k){#1};}
+\newcommand\pill[2][vteal]{\tikz[baseline=(p.base)]\node[fill=#1!14,text=#1!70!black,rounded corners=5pt,
+  inner xsep=5pt,inner ysep=2pt,font=\scriptsize\labelfont](p){#2};}
+\newcommand\stepdot[1]{\tikz[baseline=(c.base)]\node[circle,fill=vteal,text=white,
+  font=\scriptsize\displaybold,inner sep=0pt,minimum size=15pt](c){#1};}
+
+% A screenshot. Optional width fraction, file name in img/, caption.
+\newcommand\shot[3][1.1]{%
+  \par\smallskip
+  \begin{center}
+    \makebox[\linewidth]{\includegraphics[width=#1\linewidth]{img/#2}}\par\vspace{-6pt}
+    {\footnotesize\color{vslate}\faIcon[regular]{camera}\enspace #3}
+  \end{center}\par\smallskip}
+
+% ---------------------------------------------------------------- lists
+\setlist{itemsep=2pt,topsep=4pt,parsep=1pt}
+\setlist[itemize,1]{label={\color{vteal}\footnotesize\faIcon{chevron-right}},leftmargin=1.6em}
+\setlist[itemize,2]{label={\color{vslate}\scriptsize\faIcon[regular]{circle}},leftmargin=1.4em}
+\setlist[enumerate,1]{label={\color{vtealdeep}\displaybold\arabic*.},leftmargin=1.8em}
+\newlist{steps}{enumerate}{1}
+\setlist[steps]{label=\protect\stepdot{\arabic*},leftmargin=2.3em,itemsep=5pt,labelsep=0.6em}
+\newlist{checks}{itemize}{1}
+\setlist[checks]{label={\color{vtealdeep}\faIcon[regular]{check-square}},leftmargin=1.9em,itemsep=3pt}
+\newlist{nopes}{itemize}{1}
+\setlist[nopes]{label={\color{vcoraldeep}\faIcon[regular]{times-circle}},leftmargin=1.9em,itemsep=3pt}
+
+% ---------------------------------------------------------------- callout boxes
+\tcbset{
+  vbox/.style 2 args={enhanced,breakable,colback=#1!7!white,colframe=#1,boxrule=0pt,
+    leftrule=3.2pt,arc=3pt,outer arc=3pt,left=11pt,right=11pt,top=8pt,bottom=8pt,
+    before skip=10pt,after skip=12pt,
+    before upper={{\labelfont\scriptsize\color{#1!75!black}#2}\par\vspace{3pt}}},
+}
+\newtcolorbox{tldr}{vbox={vteal}{\faIcon{bolt}\enspace TL;DR},colback=vteal!9!white,fontupper=\semibold}
+\newtcolorbox{quickwin}{vbox={vgreen}{\faIcon{rocket}\enspace QUICK WIN}}
+\newtcolorbox{headsup}{vbox={vamber}{\faIcon{exclamation-triangle}\enspace HEADS UP}}
+\newtcolorbox{danger}{vbox={vcoral}{\faIcon{skull-crossbones}\enspace HERE BE DRAGONS}}
+\newtcolorbox{squirrel}{vbox={vviolet}{\faIcon{paw}\enspace SQUIRREL! \normalfont\itshape\color{vslate}(a tangent. skip it if you like)}}
+\newtcolorbox{whyso}{vbox={vsky}{\faIcon[regular]{lightbulb}\enspace WHY THOUGH?}}
+\newtcolorbox{pocket}{enhanced,breakable,colback=vnavy,colframe=vnavy,arc=5pt,boxrule=0pt,
+  left=14pt,right=14pt,top=11pt,bottom=11pt,before skip=16pt,after skip=10pt,
+  colupper=white,
+  before upper={{\labelfont\scriptsize\color{vteal}\faIcon{brain}\enspace POCKET THIS}\par\vspace{4pt}},
+  overlay={\node[anchor=north east,font=\fontsize{46}{46}\selectfont,text=vteal,opacity=0.13]
+    at ([xshift=-8pt,yshift=-4pt]frame.north east) {\faIcon{brain}};}}
+\newenvironment{pocketlist}{\begin{itemize}[label={\color{vteal}\faIcon{check}},leftmargin=1.7em,itemsep=3pt]}{\end{itemize}}
+
+% ---------------------------------------------------------------- shell listings
+\lstdefinestyle{shell}{
+  basicstyle=\ttfamily\small\color{white!90!vmist},
+  columns=fullflexible,keepspaces=true,showstringspaces=false,
+  breaklines=true,breakatwhitespace=true,
+  postbreak=\mbox{\textcolor{vslate}{$\hookrightarrow$}\space},
+  morecomment=[l]{\#\ },commentstyle=\color{vslate!55!white},
+  literate={\$\ }{{\textcolor{vteal}{\$}\ }}2 {~}{{\textasciitilde}}1,
+  upquote=true}
+\newtcblisting{shell}{enhanced,breakable,listing only,listing options={style=shell},
+  colback=vnavy,colframe=vnavy,boxrule=0pt,arc=5pt,left=12pt,right=12pt,top=13pt,bottom=7pt,
+  before skip=8pt,after skip=10pt,
+  overlay={\foreach \c [count=\i] in {vcoral,vamber,vgreen}
+    {\fill[\c] ([xshift=6pt+\i*8pt,yshift=-7pt]frame.north west) circle (2.1pt);}}}
+\newtcblisting{plain}{enhanced,breakable,listing only,
+  listing options={basicstyle=\ttfamily\small\color{vtext},columns=fullflexible,keepspaces,
+    upquote=true,literate={~}{{\textasciitilde}}1},
+  colback=vmist,colframe=vline,boxrule=0.4pt,arc=4pt,left=10pt,right=10pt,top=6pt,bottom=6pt}
+
+% ---------------------------------------------------------------- tables
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand\thead[1]{\leavevmode{\labelfont\scriptsize\color{vslate}#1}}
+\newenvironment{vtable}[1]
+  {\par\smallskip\rowcolors{2}{vmist}{white}\renewcommand\arraystretch{1.45}%
+   \small\tabularx{\linewidth}{#1}\toprule}
+  {\bottomrule\endtabularx\par\smallskip}
+
+% ---------------------------------------------------------------- headers & footers
+\newcommand\pagepill{\tikz[baseline=(n.base)]\node[fill=vnavy,text=white,rounded corners=7pt,
+  inner xsep=8pt,inner ysep=3.5pt,font=\footnotesize\displaybold](n){\thepage};}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand\headrulewidth{0pt}
+\fancyhead[L]{\footnotesize\displaysemi\color{vslate}\leftmark}
+\fancyhead[R]{\footnotesize\color{vslate}{\displaybold\color{vteal}vault}\enspace field guide}
+\fancyfoot[C]{\pagepill}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\pagepill}}
+\renewcommand\chaptermark[1]{\markboth{#1}{}}
+\renewcommand\sectionmark[1]{}
+
+% ---------------------------------------------------------------- chapter banners
+\newif\ifvappendix
+\newcommand\vaultchaptercount{11}
+\newcommand\vbanner[3]{% #1 label, #2 big mark, #3 title
+  \begin{tikzpicture}[remember picture,overlay]
+    \shade[left color=vnavy,right color=vink]
+      (current page.north west) rectangle ([yshift=-72mm]current page.north east);
+    \begin{scope}
+      \clip (current page.north west) rectangle ([yshift=-72mm]current page.north east);
+      \foreach \r in {14,24,34,44,54,64}
+        \draw[vteal,opacity=0.13,line width=0.7pt]
+          ([xshift=-34mm,yshift=-38mm]current page.north east) circle (\r mm);
+      \foreach \a in {0,6,...,354}
+        \draw[vteal,opacity=0.22,line width=0.5pt]
+          ([xshift=-34mm,yshift=-38mm]current page.north east) ++(\a:44mm) -- ++(\a:3mm);
+      \node[anchor=center,font=\displayblack\fontsize{96}{96}\selectfont,text=vteal]
+        at ([xshift=-34mm,yshift=-38mm]current page.north east) {#2};
+    \end{scope}
+    \fill[vamber] ([yshift=-72mm]current page.north west) rectangle
+      ([yshift=-73.4mm,xshift=62mm]current page.north west);
+    \node[anchor=south west,font=\labelfont\scriptsize,text=vteal]
+      at ([xshift=26mm,yshift=-27mm]current page.north west) {#1};
+    \node[anchor=north west,text width=118mm,align=left,text=white,
+      font={\display\fontsize{27}{31}\selectfont\hyphenpenalty=10000\exhyphenpenalty=10000}]
+      at ([xshift=25.4mm,yshift=-30mm]current page.north west) {#3};
+    \ifvappendix\else\ifnum\value{chapter}>0
+      \foreach \i in {1,...,\vaultchaptercount}{
+        \ifnum\i<\numexpr\value{chapter}+1\relax
+          \fill[vteal] ([xshift=26mm+\i*5.2mm-5.2mm,yshift=-63mm]current page.north west) circle (1.5pt);
+        \else
+          \draw[vteal!60,line width=0.5pt] ([xshift=26mm+\i*5.2mm-5.2mm,yshift=-63mm]current page.north west) circle (1.5pt);
+        \fi}
+      \node[anchor=west,font=\scriptsize\color{white!60!vslate}]
+        at ([xshift=26mm+\vaultchaptercount*5.2mm,yshift=-63mm]current page.north west)
+        {you are here};
+    \fi\fi
+  \end{tikzpicture}%
+  \par\vspace*{40mm}}
+\newcommand\vchapterhead[1]{\ifvappendix\vbanner{APPENDIX \thechapter}{\thechapter}{#1}\else
+  \vbanner{CHAPTER \thechapter\ \ /\ \ \vaultchaptercount}{\thechapter}{#1}\fi}
+\titleformat{\chapter}[block]{}{}{0pt}{\vchapterhead}
+\titleformat{name=\chapter,numberless}[block]{}{}{0pt}{\vbanner{THE VAULT FIELD GUIDE}{\faIcon{key}}}
+\titlespacing*{\chapter}{0pt}{-14mm}{6mm}
+
+\titleformat{\section}[hang]{\display\fontsize{16.5}{20}\selectfont\color{vink}}
+  {\llap{\color{vteal}\thesection\hspace{0.65em}}}{0pt}{}
+\titlespacing*{\section}{0pt}{18pt plus 4pt minus 2pt}{6pt}
+\newcommand\vsubhead[1]{\llap{\color{vteal}\scriptsize\faIcon{square-full}\hspace{0.6em}}#1}
+\titleformat{\subsection}[block]{\displaybold\fontsize{12}{15}\selectfont\color{vink}}
+  {}{0pt}{\vsubhead}
+\titlespacing*{\subsection}{0pt}{12pt plus 3pt}{3pt}
+\setcounter{secnumdepth}{1}
+\setcounter{tocdepth}{1}
+
+% ---------------------------------------------------------------- contents
+\titlecontents{chapter}[0pt]{\addvspace{9pt}\display\fontsize{12.5}{16}\selectfont\color{vink}}
+  {\makebox[11mm][l]{\color{vteal}\thecontentslabel}}{}
+  {\hfill\color{vtealdeep}\contentspage}
+\titlecontents{section}[11mm]{\addvspace{1pt}\small\color{vtext}}
+  {\makebox[10mm][l]{\color{vslate}\thecontentslabel}}{}
+  {\color{vline}\titlerule*[0.55pc]{.}\color{vslate}\contentspage}
+\newcommand\tagline[1]{\addtocontents{toc}{\protect\vspace{-1pt}\protect\hspace*{11mm}%
+  {\protect\footnotesize\protect\itshape\protect\color{vslate}#1}\protect\par}}
+
+% ---------------------------------------------------------------- cover
+\newcommand\vaultdoor[2]{% #1 centre coordinate, #2 radius in mm
+  \begin{scope}[shift={#1}]
+    \foreach \g/\o in {1.42/0.035,1.3/0.05,1.2/0.07,1.12/0.09}
+      \fill[vteal,opacity=\o] (0,0) circle (#2*\g mm);
+    \fill[vink] (0,0) circle (#2 mm);
+    \draw[vteal,line width=1.6pt] (0,0) circle (#2 mm);
+    \draw[vteal!55,line width=0.5pt] (0,0) circle (#2*0.93 mm);
+    \foreach \a in {0,3,...,357}
+      \draw[vteal!70,line width=0.45pt] (\a:#2*0.93 mm) -- (\a:#2*0.885 mm);
+    \foreach \a in {0,30,...,330}
+      \draw[vteal,line width=1.1pt] (\a:#2*0.93 mm) -- (\a:#2*0.85 mm);
+    \fill[vnavy] (0,0) circle (#2*0.76 mm);
+    \draw[vteal!40,line width=0.6pt] (0,0) circle (#2*0.76 mm);
+    \foreach \a in {22.5,67.5,...,337.5}
+      {\fill[vink] (\a:#2*0.66 mm) circle (#2*0.055 mm);
+       \draw[vteal!80,line width=0.6pt] (\a:#2*0.66 mm) circle (#2*0.055 mm);}
+    \draw[vamber,line width=2.2pt,line cap=round] (0,0) circle (#2*0.34 mm);
+    \foreach \a in {90,210,330}
+      {\draw[white,line width=3.6pt,line cap=round] (\a:#2*0.1 mm) -- (\a:#2*0.5 mm);
+       \fill[white] (\a:#2*0.5 mm) circle (#2*0.045 mm);}
+    \fill[white] (0,0) circle (#2*0.12 mm);
+    \fill[vamber] (0,0) circle (#2*0.055 mm);
+  \end{scope}}
+
+\newcommand\makecover{%
+  \thispagestyle{empty}
+  \begin{tikzpicture}[remember picture,overlay]
+    \shade[top color=vink,bottom color=vnavy]
+      (current page.north west) rectangle (current page.south east);
+    % ciphertext rain
+    \pgfmathsetseed{1789}
+    \begin{scope}
+      \clip (current page.north west) rectangle (current page.south east);
+      \foreach \y in {0,...,58}{
+        \pgfmathrandominteger{\off}{0}{60}
+        \node[anchor=west,font=\ttfamily\fontsize{6.5}{6.5}\selectfont,text=vteal,opacity=0.075]
+          at ([xshift=-\off mm,yshift=-\y*5.1mm-3mm]current page.north west)
+          {9f3a c01d e55b 7a90 b4f2 0e6c d318 a7e4 52cb 11f0 8d6e 4ab9 e203 7c5f 96d1 3be8 f40a 6d27 c9b3 0a5e 71fd 2c84 be16 5903 d7aa 18e9 f36b 4c20 a95d};}
+    \end{scope}
+    \vaultdoor{($(current page.center)+(38mm,42mm)$)}{62}
+    % title block
+    \node[anchor=south west,font=\labelfontwide\small,text=vteal]
+      at ([xshift=24mm,yshift=112mm]current page.south west) {THE FIELD GUIDE};
+    \node[anchor=north west,font=\displayblack\fontsize{104}{104}\selectfont,text=white]
+      at ([xshift=21mm,yshift=110mm]current page.south west) {vault};
+    \fill[vamber] ([xshift=25mm,yshift=72mm]current page.south west) rectangle ++(34mm,1.6mm);
+    \node[anchor=north west,text width=130mm,align=left,
+      font=\lightfont\fontsize{17}{23}\selectfont,text=white!85!vteal]
+      at ([xshift=24mm,yshift=66mm]current page.south west)
+      {Post-quantum file encryption.\\ With a secret trapdoor.};
+    \node[anchor=south west] at ([xshift=24mm,yshift=26mm]current page.south west)
+      {\coverchip{\faIcon{shield-alt}}{FrodoKEM + ML-KEM}\hspace{2.5mm}%
+       \coverchip{\faIcon{user-secret}}{decoy passphrase}\hspace{2.5mm}%
+       \coverchip{\faIcon{microchip}}{one binary, 43 platforms}};
+    \node[anchor=south east,font=\scriptsize\labelfont,text=white!55!vslate]
+      at ([xshift=-22mm,yshift=14mm]current page.south east) {VERSION \vaultversion\ \ \textbullet\ \ \vaultdate};
+    \node[anchor=south west,font=\footnotesize\itshape,text=white!55!vslate]
+      at ([xshift=24mm,yshift=14mm]current page.south west) {for humans who skim};
+  \end{tikzpicture}}
+\newcommand\coverchip[2]{\tikz[baseline=(c.base)]\node[draw=vteal!70,line width=0.6pt,rounded corners=8pt,
+  text=white,font=\footnotesize\semibold,inner xsep=7pt,inner ysep=4pt](c){{\color{vteal}#1}\enspace #2};}
+
+\endinput

@@ -21,6 +21,12 @@ go test ./...
 both armv6 and armv7, and writes `dist/SHA256SUMS`. Set `TARGETS` to build a
 subset, for example `TARGETS="linux/amd64 darwin/arm64" ./build.sh`.
 
+## User guide
+
+A full illustrated guide lives in `docs/guide`. Build the PDF with
+`docs/guide/build-pdf.sh`, which fetches Tectonic if it isn't installed.
+`docs/guide/shots.py` regenerates its screenshots from the real binary.
+
 ## Use
 
 ```sh

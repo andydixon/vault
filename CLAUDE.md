@@ -17,6 +17,8 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 - `lock*.go` - vault lock on `DIR/.lock`: fcntl on unix, LockFileEx on
   Windows, an exclusive lock file elsewhere. Writers lock exclusively,
   readers shared, taken after the passphrase prompt.
+- `docs/guide` - LaTeX user guide (`build-pdf.sh` via Tectonic; `shots.py`
+  re-shoots screenshots from the real binary). Keep it in step with the CLI.
 - `build.sh` - cross-compiles every `go tool dist list` target except
   iOS and android/386, amd64, arm (cgo-only).
 - `internal/pqcrypt` - file encryption (header + STREAM ChaCha20-Poly1305),

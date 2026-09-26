@@ -2,3 +2,7 @@
 /vault.exe
 .claude/
 /dist
+/docs/guide/.tools/
+/docs/guide/version.tex
+/docs/guide/vault-guide.pdf
+/docs/guide/*.log

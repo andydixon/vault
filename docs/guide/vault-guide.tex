@@ -1,0 +1,1217 @@
+% The vault field guide. Build with ./build-pdf.sh
+\documentclass[10pt,oneside,openany]{book}
+\usepackage{vaultguide}
+\InputIfFileExists{version.tex}{}{\newcommand\vaultversion{dev}\newcommand\vaultdate{\today}}
+
+\hypersetup{pdftitle={vault: the field guide},pdfauthor={The vault Authors},
+  pdfsubject={Post-quantum file encryption with a decoy passphrase}}
+
+\begin{document}
+
+\frontmatter
+\makecover
+\clearpage
+
+% ======================================================================
+\chapter*{Hi. Start here.}
+\markboth{Start here}{}
+\addcontentsline{toc}{chapter}{Start here}
+
+This guide is built for skimming. Genuinely. You are allowed to jump
+around, read the boxes and ignore the paragraphs, or read chapter 5 first
+because that's the one with the commands in it. Nobody's checking.
+
+Every chapter opens with a \hl{TL;DR}. Read that and you've got the gist. The
+rest is there for when you want the detail, or when something goes wrong at
+11pm and you need to know \emph{exactly} what a message means.
+
+\section*{The boxes, decoded}
+
+\begin{tldr}
+The whole chapter in about three lines. If you only read one thing, read this.
+\end{tldr}
+
+\begin{quickwin}
+A small thing you can do right now that makes life better.
+\end{quickwin}
+
+\begin{headsup}
+Something that will trip you up if you're not expecting it.
+\end{headsup}
+
+\begin{danger}
+Something that can lose you data. These are rare. Read every one of them.
+\end{danger}
+
+\begin{squirrel}
+A tangent. Interesting, possibly, but you can skip it and lose nothing.
+\end{squirrel}
+
+\begin{whyso}
+The reasoning behind a design decision, for the curious.
+\end{whyso}
+
+\begin{pocket}
+The end-of-chapter recap. A checklist of the things worth keeping in your head.
+\end{pocket}
+
+\section*{The absolute fastest route}
+
+Got two minutes? Here's all of it:
+
+\begin{shell}
+$ vault genkey            # make your key (pick a good passphrase)
+$ vault init              # make your vault
+$ vault add taxes.pdf     # put something in
+$ vault list              # see what's in there
+$ vault get taxes.pdf     # get it back out
+\end{shell}
+
+That's the tool. Everything after this page is detail, safety rails and the
+fun decoy trick in chapter 6. \faIcon[regular]{smile}
+
+{\hypersetup{linkcolor=vtext}\tableofcontents}
+
+\mainmatter
+
+% ======================================================================
+\chapter{Meet vault}
+\tagline{what it is, what it isn't, and a 30-second mental model}
+
+\begin{tldr}
+vault is one small program that keeps your files encrypted in a folder. It
+uses post-quantum cryptography, hides your file names and sizes, and has an
+optional decoy passphrase that shows a harmless set of files instead of the
+real ones.
+\end{tldr}
+
+\section{What it actually does}
+
+You give vault a file. It encrypts the file and drops the result into your
+\emph{vault}, which is just a folder. Later you ask for the file back and vault
+decrypts it. That's the core loop. Put in, take out.
+
+The interesting part is what the folder looks like from the outside. Nothing.
+Well, not \emph{nothing}. A pile of randomly named files, all dated 1 January
+1970, in a handful of suspiciously round sizes. No names. No real sizes. No
+dates. No folders. Someone who steals the folder learns roughly how much stuff
+you have, and that's about it.
+
+\begin{center}
+\begin{tikzpicture}[
+  doc/.style={draw=vsky,fill=vsky!8,rounded corners=2pt,minimum width=17mm,minimum height=8mm,font=\scriptsize\ttfamily},
+  blob/.style={draw=vteal,fill=vteal!10,rounded corners=2pt,minimum width=24mm,minimum height=6.5mm,font=\scriptsize\ttfamily},
+  lbl/.style={font=\scriptsize\labelfont,text=vslate}]
+  \node[doc] (a) at (0,1.1) {taxes.pdf};
+  \node[doc] (b) at (0,0) {passport.jpg};
+  \node[doc] (c) at (0,-1.1) {diary.md};
+  \node[lbl] at (0,2) {YOUR FILES};
+  \node[circle,fill=vnavy,minimum size=19mm,text=white,font=\Large] (v) at (4,0) {\faIcon{lock}};
+  \node[font=\scriptsize\displaybold,text=vnavy] at (4,-1.45) {vault};
+  \node[font=\tiny,text=vslate,align=center] at (4,-1.85) {passphrase + key};
+  \node[blob] (r1) at (8.2,1.3) {3fa9c1\ldots\ 1970};
+  \node[blob] (r2) at (8.2,0.45) {b07e2d\ldots\ 1970};
+  \node[blob] (r3) at (8.2,-0.4) {91c4aa\ldots\ 1970};
+  \node[blob] (r4) at (8.2,-1.25) {e5580f\ldots\ 1970};
+  \node[lbl] at (8.2,2) {WHAT A THIEF SEES};
+  \foreach \n in {a,b,c} \draw[-{Stealth[length=2.5mm]},vslate,thick] (\n.east) -- (v.west);
+  \foreach \n in {r1,r2,r3,r4} \draw[-{Stealth[length=2.5mm]},vteal,thick] (v.east) -- (\n.west);
+\end{tikzpicture}
+\end{center}
+
+\section{The three things that make it different}
+
+\subsection{It's post-quantum}
+Most encryption you use today would, in theory, fall to a big enough quantum
+computer. Nobody has one yet. But someone could copy your encrypted files
+\emph{today} and sit on them until they do. It's called \emph{harvest now,
+decrypt later}, and it's a real strategy.
+
+vault uses two post-quantum algorithms at once: \hl{FrodoKEM-640} and
+\hl{ML-KEM-768}. An attacker has to break \emph{both}. Chapter 9 has the gory
+details.
+
+\subsection{It hides metadata, not just contents}
+Plenty of tools encrypt what's \emph{in} your files but happily leave
+\file{divorce-papers-final-v3.pdf} sitting there in plain sight. vault encrypts
+the names too. And the sizes. And the timestamps.
+
+\subsection{It can lie for you}
+Optionally, your key can have a second, \hl{decoy} passphrase. Type it, and
+vault shows a completely separate set of files. Your real files don't appear,
+don't error, don't leave a hint. They just aren't there, as far as anyone
+watching can tell. That's chapter 6, and yes, it's the fun one.
+
+\section{What vault is \emph{not}}
+
+Honesty time. Knowing the edges matters as much as knowing the middle.
+
+\begin{nopes}
+  \item \textbf{Not a sync service.} It's a folder. You can sync the folder
+        yourself (chapter 8), but vault doesn't do it for you.
+  \item \textbf{Not a backup by itself.} One copy of anything is zero copies.
+        Back up the vault folder \emph{and} your key.
+  \item \textbf{Not magic against malware.} If something nasty is running on
+        your computer while you type your passphrase, it can watch you type
+        it. No file-encryption tool fixes a compromised machine.
+  \item \textbf{Not recoverable without the passphrase.} There is no reset
+        link. There's no ``forgot password''. That's the whole point, and it
+        cuts both ways.
+\end{nopes}
+
+\begin{squirrel}
+Why is it called \emph{vault} and not something cooler? Because you type it a
+lot, and five letters you already know how to spell beat a clever name every
+single time. Also, all the cool names were taken.
+\end{squirrel}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item vault encrypts files into a folder and hides their names, sizes and dates.
+  \item The encryption is post-quantum: two algorithms, attacker must break both.
+  \item An optional decoy passphrase shows a different, harmless set of files.
+  \item Lose the passphrase and the files are gone. No reset. Ever.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Install it}
+\tagline{grab a binary, check it, put it on your PATH}
+
+\begin{tldr}
+Download the one file for your system, check its SHA-256, rename it to
+\cmd{vault} (or \cmd{vault.exe}), and put it somewhere on your \env{PATH}.
+Or build every platform yourself with \cmd{./build.sh}.
+\end{tldr}
+
+\section{Pick your file}
+
+vault is a single self-contained program. No installer, no runtime, no
+dependencies. You just need the right file for your operating system and CPU.
+
+\begin{vtable}{>{\semibold}p{34mm}Y>{\ttfamily\small}p{50mm}}
+\thead{YOU HAVE} & \thead{WHICH MEANS} & \thead{DOWNLOAD} \\ \midrule
+Windows PC & most laptops and desktops & vault-windows-amd64.exe \\
+Windows on ARM & Surface Pro X, Snapdragon laptops & vault-windows-arm64.exe \\
+Mac, 2020 or later & Apple silicon (M1, M2, M3\ldots) & vault-darwin-arm64 \\
+Mac, older & Intel & vault-darwin-amd64 \\
+Linux PC or server & almost everything & vault-linux-amd64 \\
+Linux on ARM64 & Pi 4/5 (64-bit OS), Graviton, Ampere & vault-linux-arm64 \\
+Raspberry Pi, 32-bit & Pi 2, 3, 4 on a 32-bit OS & vault-linux-armv7 \\
+Raspberry Pi Zero / 1 & the tiny older ones & vault-linux-armv6 \\
+Android & in Termux & vault-android-arm64 \\
+FreeBSD, OpenBSD, NetBSD & amd64, arm64, 386, arm\ldots & vault-freebsd-amd64 etc. \\
+Something exotic & RISC-V, POWER, s390x, MIPS, LoongArch & see \cmd{dist/} \\
+\end{vtable}
+
+\begin{squirrel}
+The full release covers 43 platform builds, including AIX, Solaris, illumos,
+Plan~9 and even WebAssembly. Will you ever need \file{vault-plan9-arm}?
+Almost certainly not. Is it pleasing that it exists? Extremely.
+\end{squirrel}
+
+\begin{headsup}
+Not sure which Linux you have? Run \cmd{uname -m}. \cmd{x86\_64} means amd64,
+\cmd{aarch64} means arm64, \cmd{armv7l} means armv7, and \cmd{armv6l} means armv6.
+\end{headsup}
+
+\section{Check the file hasn't been tampered with}
+
+Every release comes with a \file{SHA256SUMS} file. It takes ten seconds to
+check, and it's the difference between running \emph{vault} and running
+\emph{something pretending to be vault}. For an encryption tool, that matters.
+
+\begin{shell}
+# Linux
+$ sha256sum -c SHA256SUMS --ignore-missing
+
+# macOS
+$ shasum -a 256 -c SHA256SUMS --ignore-missing
+
+# Windows (PowerShell): compare the output with the line in SHA256SUMS
+PS> Get-FileHash .\vault-windows-amd64.exe -Algorithm SHA256
+\end{shell}
+
+You want to see \cmd{OK}. Anything else: stop, and download it again from
+the source you trust.
+
+\section{Put it on your PATH}
+
+\subsection{Linux and macOS}
+\begin{shell}
+$ chmod +x vault-linux-amd64
+$ sudo mv vault-linux-amd64 /usr/local/bin/vault
+$ vault help
+\end{shell}
+
+No admin rights? Use \file{\tld/.local/bin} instead, which most modern
+distributions already have on the \env{PATH}.
+
+\begin{headsup}
+\textbf{macOS says the file ``cannot be opened''?} It's not signed by Apple,
+so Gatekeeper quarantines it. Once you've checked the SHA-256, clear the flag:
+\cmd{xattr -d com.apple.quarantine /usr/local/bin/vault}.
+\end{headsup}
+
+\subsection{Windows}
+\begin{steps}
+  \item Make a folder, say \file{C:\textbackslash Tools}, and move the file in,
+        renamed to \file{vault.exe}.
+  \item Start menu, search for \hl{``environment variables''}, open
+        \hl{Edit the environment variables for your account}.
+  \item Edit \hl{Path}, add \file{C:\textbackslash Tools}, and click OK.
+  \item Open a \emph{new} terminal and run \cmd{vault help}.
+\end{steps}
+
+\subsection{Android (Termux)}
+\begin{shell}
+$ curl -LO https://.../vault-android-arm64
+$ chmod +x vault-android-arm64 && mv vault-android-arm64 $PREFIX/bin/vault
+\end{shell}
+
+\section{Did it work?}
+
+Run \cmd{vault help}. You should see the full command list:
+
+\shot{help}{\cmd{vault help}: everything vault can do, on one screen}
+
+\section{Building it yourself}
+
+Prefer to build from source? You need Go 1.26.6 or newer. Then:
+
+\begin{shell}
+$ go build .          # just your platform, produces ./vault
+$ ./build.sh          # every platform, into ./dist, with SHA256SUMS
+\end{shell}
+
+\cmd{build.sh} cross-compiles every target Go supports without C libraries.
+32-bit ARM Linux gets two builds, armv6 and armv7. Want just a few? Set
+\env{TARGETS}. Want them somewhere else? Set \env{OUT}.
+
+\shot{build}{A partial build, followed by checking every binary against SHA256SUMS}
+
+\begin{whyso}
+The binaries are \emph{static} and \emph{reproducible}: no C code, no system
+libraries, file paths stripped, build IDs zeroed. Two people building the same
+commit get byte-identical files, so you can check a release against your own
+build.
+\end{whyso}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item One file per platform. Rename it \cmd{vault} and put it on your \env{PATH}.
+  \item Always check the SHA-256 against \file{SHA256SUMS}.
+  \item macOS: clear the quarantine flag after checking.
+  \item \cmd{./build.sh} builds all 43 platform binaries from source.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Your key}
+\tagline{the one file that matters most, and the passphrase that guards it}
+
+\begin{tldr}
+\cmd{vault genkey} creates your key at \file{\tld/.vault/key}, protected by a
+passphrase. It can also set a decoy passphrase. \textbf{Back the key file up.}
+Without it, and its passphrase, your files cannot be recovered by anyone.
+\end{tldr}
+
+\section{Making one}
+
+\begin{shell}
+$ vault genkey
+\end{shell}
+
+vault asks for a passphrase, then asks you to type it again. Nothing appears
+on screen as you type. That's deliberate, not broken.
+
+\shot{genkey-prompt}{Waiting for your passphrase. Typing is invisible on purpose.}
+
+Next it offers the \hl{decoy passphrase}. Press \keycap{Enter} to skip it, or
+set one now. We'll cover what it's for in chapter 6. The short version: it
+opens a separate, fake-but-plausible set of files.
+
+\shot{genkey-decoy-prompt}{The optional decoy passphrase. An empty answer means ``no decoy''.}
+
+\begin{headsup}
+\textbf{The decoy can only be set here, when the key is made.} There's no
+``add a decoy later'' command. If you think you might ever want one, set one
+now. It costs nothing, and nobody can tell it's there.
+\end{headsup}
+
+When it's done, you get one line and one small file:
+
+\shot{genkey}{Your key: 319 bytes, readable only by you}
+
+\section{Choosing a passphrase that doesn't suck}
+
+The key file is encrypted with your passphrase using \hl{Argon2id}, a
+deliberately slow, memory-hungry function. Each guess costs an attacker real
+time and 64\,MiB of memory. Slow guessing only helps, though, if there are a lot
+of guesses to make.
+
+\begin{checks}
+  \item \textbf{Use four or more random words.} \emph{correct horse battery
+        staple} beats \emph{P@ssw0rd!} by a mile, and you can actually remember it.
+  \item \textbf{Make it unique.} Not your email password. Not your bank's.
+  \item \textbf{Make the decoy believable.} It should feel like something
+        you'd genuinely pick. More in chapter 6.
+\end{checks}
+
+\begin{quickwin}
+Use a password manager's \emph{passphrase} generator (most have one) to make
+the words, then practise typing it five times. Muscle memory is a legitimate
+security tool.
+\end{quickwin}
+
+\section{Where it lives}
+
+By default your key is \file{\tld/.vault/key}. On Windows, that's
+\file{\%USERPROFILE\%\textbackslash.vault\textbackslash key}. Want it
+somewhere else, like a USB stick? Two options:
+
+\begin{shell}
+$ vault genkey --key /media/usb/vault.key     # this once
+$ export VAULT_KEY=/media/usb/vault.key       # every command from now on
+\end{shell}
+
+\begin{squirrel}
+Keeping the key on a USB stick and the vault on your laptop is a neat trick.
+Pull the stick out and the vault is inert, even if someone knows your
+passphrase. Two things to steal instead of one.
+\end{squirrel}
+
+\section{Back. It. Up.}
+
+\begin{danger}
+\textbf{If you lose the key file, or forget the passphrase, your files are
+gone.} Not ``hard to get back''. Gone. vault has no recovery mechanism, no
+master key, no back door. That's what makes it trustworthy, and it's also
+what makes a lost key final.
+\end{danger}
+
+The key file is encrypted, so a copy is safe to keep somewhere a little less
+private than your laptop. Some decent options:
+
+\begin{itemize}
+  \item A USB stick in a drawer. Or two, in two different drawers.
+  \item Your password manager, as an attached file.
+  \item Printed out. It's only a few lines of text. Paper survives surprisingly well.
+\end{itemize}
+
+\begin{whyso}
+\textbf{What's actually in the key file?} Two equal-sized encrypted slots, in
+random order. Each passphrase opens exactly one. When there's no decoy, the
+spare slot is just random bytes, and nobody can tell random bytes from an
+encrypted slot. So the file gives away nothing about whether a decoy exists.
+\end{whyso}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item \cmd{vault genkey} makes \file{\tld/.vault/key}. It won't overwrite an existing key.
+  \item Four-plus random words. Unique. Practise it.
+  \item Decide on a decoy now. It can't be added later.
+  \item Back up the key file. Somewhere else. Today.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Your first vault}
+\tagline{one command, and a peek inside}
+
+\begin{tldr}
+\cmd{vault init} creates an empty vault at \file{\tld/.vault/store}. It's
+just a folder. Inside it seeds some random filler, which is normal and part of
+the decoy trick.
+\end{tldr}
+
+\section{Create it}
+
+\begin{shell}
+$ vault init
+\end{shell}
+
+That's it. No passphrase needed, because an empty vault has nothing to
+protect yet.
+
+\shot{init}{A fresh vault. Two sub-folders, a marker, and\ldots\ records already?!}
+
+\section{Wait, why is there already stuff in it?}
+
+Good catch. A brand new vault holds somewhere between 8 and 32 entries of
+random filler. They're encrypted to a key that was thrown away the moment
+it was used, so \emph{nobody} can open them. Not you, not us, not anyone.
+
+It looks weird, but it's what makes the decoy passphrase believable. Every
+vault, decoy or not, always contains entries you can't open. So when someone
+with your decoy passphrase sees unopenable entries, that's completely
+unremarkable. It's just filler. (Some of it might not be. They can't tell.)
+
+\begin{headsup}
+The filler takes a few tens of megabytes. That's the price of plausible
+deniability, and it's paid once.
+\end{headsup}
+
+\section{More than one vault}
+
+Want a separate vault for work stuff? Point \cmd{--vault} anywhere:
+
+\begin{shell}
+$ vault init --vault ~/work-vault
+$ vault add contract.pdf --vault ~/work-vault
+\end{shell}
+
+Or set \env{VAULT\_DIR} so every command uses it. The same key works with any
+number of vaults.
+
+\begin{quickwin}
+Add \cmd{export VAULT\_DIR=\ldots} to your shell profile and you'll never
+type \cmd{--vault} again.
+\end{quickwin}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item \cmd{vault init} makes \file{\tld/.vault/store}. \cmd{--vault DIR} to put it elsewhere.
+  \item Filler entries are normal. Nobody can open them. That's the point.
+  \item One key, as many vaults as you like.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Everyday moves}
+\tagline{add, list, get, mv, rm: the five commands you'll actually use}
+
+\begin{tldr}
+\cmd{add} puts files in (optionally into a folder), \cmd{list} shows them,
+\cmd{get} takes one back out, \cmd{mv} renames, \cmd{rm} deletes. Each asks
+for your passphrase. That's the whole daily workflow.
+\end{tldr}
+
+\section{Putting things in: \texttt{add}}
+
+\begin{shell}
+$ vault add FILE-OR-FOLDER [FOLDER-IN-VAULT]
+\end{shell}
+
+Give it a file, and it goes in under its own name. Give it a second argument,
+and it goes into that folder inside the vault. Give it a whole folder, and
+everything inside comes along too, subfolders and all.
+
+\shot{add}{Adding a file, a file into a folder, a whole folder, and another file}
+
+Notice what happened there:
+
+\begin{itemize}
+  \item \file{Documents/tax-return-2025.pdf} became plain \file{tax-return-2025.pdf}.
+        vault keeps the \emph{file name}, not the path you typed.
+  \item With a second argument, \file{id}, the passport scan landed in
+        \file{id/passport-scan.jpg}.
+  \item Adding the folder \file{Documents/letters} kept its own name and
+        structure: \file{letters/bank.txt}, \file{letters/landlord.txt}.
+\end{itemize}
+
+\begin{headsup}
+\textbf{Folders inside a vault aren't real folders.} They're just part of each
+file's name, like \file{letters/bank.txt}. So there's no \cmd{mkdir}, and a
+folder disappears when its last file goes. No housekeeping required.
+\end{headsup}
+
+\subsection{Adding something that's already there}
+Adding a name that already exists \hl{replaces} it, and vault tells you so.
+The old version is deleted \emph{after} the new one is safely stored, so a
+crash halfway through never leaves you with neither.
+
+\subsection{What gets skipped}
+When adding a folder, anything that isn't a plain file, such as symbolic
+links, sockets or devices, is skipped with a note. Files larger than 1\,TiB are
+refused. (If you have a single 1\,TiB file, we have questions.)
+
+\section{Seeing what's inside: \texttt{list}}
+
+\begin{shell}
+$ vault list            # everything
+$ vault list letters    # just what's inside letters/
+\end{shell}
+
+Each line shows the size, the file's \emph{own} last-modified time from when
+you added it, and its name, sorted alphabetically.
+
+\shot{list}{The full catalogue, then just one folder}
+
+\begin{whyso}
+\textbf{Why does \texttt{list} need my passphrase?} Because the names are
+encrypted too. Without the key, vault can't read the catalogue any better
+than a thief can.
+\end{whyso}
+
+\section{Getting things out: \texttt{get}}
+
+\begin{shell}
+$ vault get NAME               # writes the file here, under its own name
+$ vault get NAME -o OUTPUT     # writes it wherever you say
+\end{shell}
+
+\shot{get}{Getting files back, including vault refusing to overwrite}
+
+Three safety habits are built in, so you don't need to think about them:
+
+\begin{checks}
+  \item \textbf{It never overwrites.} If the output exists, vault stops. Move
+        the old one or use \cmd{-o}.
+  \item \textbf{Nothing appears until everything checks out.} vault writes to a
+        hidden temporary file, verifies every single byte, and only
+        then gives it its real name. A tampered or damaged file never shows up
+        half-written.
+  \item \textbf{It restores the details.} You get back the original permissions
+        and modification time.
+\end{checks}
+
+\section{Renaming and moving: \texttt{mv}}
+
+\begin{shell}
+$ vault mv OLD NEW
+\end{shell}
+
+\cmd{NEW} is the \emph{full} new name, folder included. So to move
+\file{notes.md} into \file{ideas}, it's \cmd{vault mv notes.md
+ideas/notes.md}, not \cmd{\ldots\ ideas/}. It won't overwrite an existing name,
+and it doesn't re-encrypt the file, so it's instant however big the file is.
+
+\section{Deleting: \texttt{rm}}
+
+\begin{shell}
+$ vault rm NAME
+\end{shell}
+
+Removes the file's catalogue entry and its encrypted contents. One file per
+command, on purpose. There's no recursive delete to fat-finger.
+
+\shot{mv-rm}{Replace, move, delete, and the result}
+
+\begin{danger}
+\textbf{\texttt{rm} is immediate and there's no undo.} No recycle bin, no
+``are you sure?''. If it matters, make sure it's backed up somewhere first.
+\end{danger}
+
+\begin{squirrel}
+Need to delete a whole folder? Loop over \cmd{list}. The name starts at
+character 31 of each line, so:\\
+\cmd{vault list old | cut -c31- | while read -r f; do vault rm "\$f"; done}\\
+With \env{VAULT\_PASSPHRASE} set, or it'll ask every time. See chapter 7.
+\end{squirrel}
+
+\section{Flags work anywhere}
+
+Every command understands \cmd{--key PATH} and \cmd{--vault DIR}, and they can
+go before, between or after the other arguments. These all do the same thing:
+
+\begin{shell}
+$ vault add --vault ~/work report.pdf
+$ vault add report.pdf --vault ~/work
+$ vault add report.pdf --vault=~/work
+\end{shell}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item \cmd{add FILE [FOLDER]}: keeps the file's name, optionally in a folder. Folders add recursively.
+  \item Adding an existing name replaces it, safely.
+  \item \cmd{list [FOLDER]}, \cmd{get NAME [-o OUT]}, \cmd{mv OLD NEW}, \cmd{rm NAME}.
+  \item \cmd{get} never overwrites and never publishes a half-checked file.
+  \item \cmd{rm} has no undo.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{The decoy passphrase}
+\tagline{one key, two passphrases, two completely different vaults}
+
+\begin{tldr}
+Set a decoy passphrase when you run \cmd{vault genkey}. Every command run with
+the decoy sees only decoy files. Your real files are invisible to it: they
+don't list, can't be fetched, and look exactly like the random filler every
+vault has. Make the decoy believable, and keep it at least as big as the real
+thing.
+\end{tldr}
+
+\section{The idea}
+
+Sometimes ``I won't tell you my passphrase'' isn't an option. A border
+crossing. A pushy partner. Someone standing over you. The decoy passphrase is
+for that moment. You type it, the vault opens, and it's full of genuinely
+private-looking stuff: bank letters, some personal notes, a few scans.
+Everything behaves normally. It's just not your \emph{real} stuff.
+
+\section{How it looks}
+
+Here's one vault, opened twice, with the two different passphrases:
+
+\shot[1.2]{decoy-views}{Same key file, same vault folder, two passphrases, two worlds}
+
+Nothing on the right hints that the left exists. Ask the decoy for a real
+file and you get the same message you'd get for a typo. The folder's entry
+count doesn't give it away either, because filler is always there:
+
+\shot{decoy-hidden}{The decoy can't see real files, and a few dozen entries on disk is unremarkable}
+
+\begin{center}
+\begin{tikzpicture}[x=5.4mm,y=5.4mm]
+  \def\cells{FRDFFRDRFFDRFDFRRFDFFRDFRDFFRFDRFDFFRDRF}
+  \newcommand\grid[4]{% x offset, title, colour for R, colour for D
+    \node[font=\scriptsize\labelfont,text=vslate,anchor=south] at (#1+3.5,5.35) {#2};
+    \foreach \i in {0,...,39}{
+      \pgfmathtruncatemacro\cx{mod(\i,8)}\pgfmathtruncatemacro\ry{\i/8}
+      \StrChar{\cells}{\numexpr\i+1\relax}[\kind]
+      \if\kind R\def\col{#3}\else\if\kind D\def\col{#4}\else\def\col{vline}\fi\fi
+      \fill[\col,rounded corners=1pt] (#1+\cx,4-\ry) rectangle ++(0.82,0.82);}}
+  \grid{0}{ON DISK}{vline}{vline}
+  \grid{10}{REAL PASSPHRASE}{vteal}{vline}
+  \grid{20}{DECOY PASSPHRASE}{vline}{vviolet}
+\end{tikzpicture}\\[2pt]
+{\footnotesize\color{vslate}Every square is an encrypted entry. Each passphrase lights up only its own. Grey is filler, or the other side.}
+\end{center}
+
+\section{Setting it up}
+
+The decoy is chosen when the key is made, and only then:
+
+\begin{steps}
+  \item Run \cmd{vault genkey}. Type your \emph{real} passphrase, twice.
+  \item At \hl{Enter decoy passphrase (empty for none)}, type the decoy. Twice.
+  \item Run \cmd{vault init} as normal.
+  \item Add some decoy files, typing the \emph{decoy} passphrase when asked.
+  \item Add your real files, typing the \emph{real} passphrase.
+\end{steps}
+
+The two must be different (vault checks). In scripts, set
+\env{VAULT\_DECOY\_PASSPHRASE} alongside \env{VAULT\_PASSPHRASE} before
+\cmd{genkey}. Chapter 7 has more on scripting.
+
+\begin{headsup}
+\textbf{Already have a key without a decoy?} You'll need a new key: run
+\cmd{genkey} with a different \cmd{--key}, make a new vault, \cmd{get}
+everything out of the old one and \cmd{add} it to the new. The key file
+format deliberately gives no way to tell whether a decoy slot is in use, so
+there's nothing to safely ``upgrade''.
+\end{headsup}
+
+\section{Why it holds up}
+
+\begin{itemize}
+  \item \textbf{The key file can't tell.} It always has two slots of identical
+        size in random order. With no decoy, one slot is random noise, which
+        looks the same as an encrypted slot. Both are tried every time, so
+        even the timing is the same.
+  \item \textbf{The vault can't tell.} Real and decoy entries are sealed to
+        different keys, but they're the same size, the same shape, and all
+        dated 1970. Nothing on disk says which key an entry belongs to.
+  \item \textbf{The filler covers for you.} Every vault starts with 8 to 32
+        entries nobody can open. So ``some entries I can't open'' is true of
+        \emph{every} vault, decoy or not.
+  \item \textbf{The errors are identical.} A real file asked for by name with
+        the decoy passphrase gives exactly the same ``not in the vault'' as
+        a typo.
+\end{itemize}
+
+\section{Making it believable: the playbook}
+
+A decoy only works if it looks like the real thing. An empty decoy vault, or
+one with two files called \file{test.txt}, is a neon sign.
+
+\begin{checks}
+  \item \textbf{Fill it with plausibly private stuff.} Bank letters, payslips,
+        a diary-ish notes file, scans of documents. The kind of thing someone
+        \emph{would} encrypt.
+  \item \textbf{Keep it bigger than your real collection}, or at least as big.
+        See the next section for why.
+  \item \textbf{Keep it alive.} Add to it now and then, so the dates in
+        \cmd{list} look like a real person uses it.
+  \item \textbf{Know it cold.} Practise the decoy as much as the real one.
+        Hesitating on the ``real'' passphrase is a tell.
+  \item \textbf{Never mention it.} Not in notes, not in a README, not
+        in a script sitting on the same machine.
+\end{checks}
+
+\section{The honest limits}
+
+\begin{headsup}
+\textbf{Numbers can give you away.} Every file is one entry (one file in
+\file{records/}), and filler adds at most 32. If the decoy shows 3 files but
+\file{records/} holds 400, the filler can't explain the difference. Keep the decoy collection
+large enough that the leftovers look like filler.
+\end{headsup}
+
+\begin{headsup}
+\textbf{Growth over time is visible.} If someone copies your vault folder
+today and again next month, they can see it grew, even if the decoy didn't
+change. They can't see \emph{what} was added. They can see \emph{that}
+something was.
+\end{headsup}
+
+\begin{nopes}
+  \item It won't help if someone saw you type the real passphrase, or has
+        malware on your machine.
+  \item It doesn't stop anyone deleting the raw files. It hides; it doesn't guard.
+  \item It isn't legal advice. Some places treat misleading an official as an
+        offence in its own right. Know where you are.
+\end{nopes}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item The decoy is set at \cmd{genkey} time only.
+  \item Decoy and real are two separate worlds in one folder. Neither can see the other.
+  \item Filler, identical entry sizes and a two-slot key file make the hiding work.
+  \item Keep the decoy big, believable and alive. Keep quiet about it.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Scripts and automation}
+\tagline{environment variables, exit codes, and a few recipes}
+
+\begin{tldr}
+Set \env{VAULT\_PASSPHRASE}, \env{VAULT\_KEY} and \env{VAULT\_DIR} and vault
+never asks anything. Output you'd pipe (\cmd{list}, \cmd{help}) goes to
+standard output; everything else goes to standard error. Exit code 0 means
+it worked.
+\end{tldr}
+
+\section{The environment variables}
+
+\begin{vtable}{>{\leavevmode\ttfamily\small\color{vvioletdeep}}p{50mm}Y}
+\thead{VARIABLE} & \thead{WHAT IT DOES} \\ \midrule
+VAULT\_PASSPHRASE & The passphrase. Skips the prompt. With \cmd{genkey}, it's the new key's passphrase. \\
+VAULT\_DECOY\_PASSPHRASE & \cmd{genkey} only: the decoy passphrase. If \env{VAULT\_PASSPHRASE} is set and this isn't, no decoy is made. \\
+VAULT\_KEY & The key file. Default \file{\tld/.vault/key}. Same as \cmd{--key}. \\
+VAULT\_DIR & The vault folder. Default \file{\tld/.vault/store}. Same as \cmd{--vault}. \\
+\end{vtable}
+
+\shot{scripting}{With the variable set, no prompts. A failed command exits with status 1.}
+
+\begin{danger}
+\textbf{Don't type a passphrase straight into a command line.} It lands in your
+shell history. Read it without echo instead:\\[2pt]
+\cmd{read -rs VAULT\_PASSPHRASE \&\& export VAULT\_PASSPHRASE}\\[2pt]
+And remember that other programs running as you can read your environment.
+For everyday use, just let vault prompt you.
+\end{danger}
+
+\section{Exit codes and output}
+
+\begin{vtable}{>{\ttfamily\small}p{16mm}Y}
+\thead{CODE} & \thead{MEANING} \\ \midrule
+0 & It worked. \\
+1 & Something went wrong. The reason is on standard error, starting \cmd{vault:}. \\
+2 & You ran \cmd{vault} with no command at all. The usage text is on standard error. \\
+\end{vtable}
+
+\cmd{list} and \cmd{help} write to standard output. Progress lines like
+\cmd{added \ldots}, \cmd{replaced \ldots} and every error go to standard
+error. So \cmd{vault list > files.txt} gives you a clean file list.
+
+\begin{squirrel}
+The \cmd{list} columns are fixed-width: size in 10 characters, two spaces,
+the date and time in 16, two spaces, then the name. The name therefore always
+starts at character 31, which is why \cmd{cut -c31-} works even for names with
+spaces in.
+\end{squirrel}
+
+\section{Recipes}
+
+\subsection{Nightly: stash a folder}
+\begin{shell}
+#!/bin/sh
+# ~/bin/stash-documents: re-adds everything in ~/Documents/private
+export VAULT_PASSPHRASE="$(cat ~/.config/vault-pass)"   # chmod 600 this file!
+vault add ~/Documents/private archive || exit 1
+\end{shell}
+
+Then run it from cron, say at 2am: \cmd{0 2 * * * \$HOME/bin/stash-documents}.
+Re-adding replaces each file, so it always holds the latest copy.
+
+\begin{headsup}
+Keeping the passphrase in a file trades safety for convenience. Anyone who can
+read that file and the key can open the vault. Only do it on a machine you
+trust completely, and never for the decoy.
+\end{headsup}
+
+\subsection{Get everything back out}
+\begin{shell}
+#!/bin/sh
+# restore the whole vault into ./restore, keeping its folders
+vault list | cut -c31- | while IFS= read -r name; do
+  mkdir -p "restore/$(dirname "$name")"
+  vault get "$name" -o "restore/$name"
+done
+\end{shell}
+
+\subsection{PowerShell on Windows}
+\begin{shell}
+PS> $env:VAULT_DIR = "D:\vault"
+PS> vault add .\report.docx
+PS> vault list
+\end{shell}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item \env{VAULT\_PASSPHRASE}, \env{VAULT\_KEY}, \env{VAULT\_DIR}: no prompts, no flags.
+  \item Exit 0 is success, 1 is an error, 2 is ``no command''.
+  \item \cmd{list} goes to stdout, so it pipes cleanly. Names start at column 31.
+  \item Keep passphrases out of your shell history.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Locking, syncing and backups}
+\tagline{two terminals, two machines, and keeping copies}
+
+\begin{tldr}
+vault locks itself: one writer at a time, and readers wait for writers. You
+don't have to do anything. Syncing the folder between machines works if only
+one machine changes it at a time. Back up the folder and the key, and you're
+covered.
+\end{tldr}
+
+\section{Locking is automatic}
+
+Commands that change the vault (\cmd{add}, \cmd{mv}, \cmd{rm}) take an
+\hl{exclusive} lock. Commands that only read (\cmd{list}, \cmd{get}) take a
+\hl{shared} one, so several can read at once. If a command has to wait, it
+says so, then carries on by itself:
+
+\shot[1.2]{locking}{The second writer waits politely for the first to finish}
+
+The lock is taken \emph{after} you've typed your passphrase, so a colleague
+who's slow at typing never blocks you.
+
+\begin{whyso}
+\textbf{What if vault crashes while holding the lock?} On Linux, macOS, the
+BSDs and Windows, the operating system drops the lock the moment the process
+dies. Nothing to clean up. On Plan~9 and WebAssembly, which have no file
+locks, vault uses a \file{.lock} file instead. If one's ever left behind,
+vault tells you after a minute exactly which file to delete.
+\end{whyso}
+
+\section{Syncing between machines}
+
+A vault is just a folder, so Syncthing, Dropbox, iCloud Drive, OneDrive,
+\cmd{rsync} or a USB stick will all carry it between computers. Copy your key
+file to each machine too, over something private.
+
+\begin{headsup}
+\textbf{Locks don't travel through sync services.} Two machines writing at
+the same time won't wait for each other. The rule: \hl{one machine writes at a
+time, and let the sync finish before you write on the other one.}
+\end{headsup}
+
+If you do slip up, it's rarely a disaster:
+
+\begin{itemize}
+  \item Sync ``conflicted copy'' files have names vault doesn't recognise, so
+        it simply ignores them.
+  \item If both machines added the same name, \cmd{list} shows the newest,
+        and the next \cmd{add} or \cmd{rm} of that name tidies up the other.
+\end{itemize}
+
+Network file systems are fine too. NFS honours vault's locks on Linux and the
+BSDs, and Windows file shares honour them from Windows.
+
+\section{Backups}
+
+Two things to back up: the \hl{vault folder} and the \hl{key file}. Ideally
+in different places. Any backup tool works, because it's all ordinary files.
+
+\begin{quickwin}
+vault never edits a file in place. Every entry is written once and later
+deleted, never changed. That makes incremental backups (\cmd{rsync},
+restic, borg, Time Machine) fast and tidy: each run only copies what's new.
+\end{quickwin}
+
+\begin{shell}
+$ rsync -a --delete ~/.vault/store/ /media/backup/vault-store/
+\end{shell}
+
+\begin{headsup}
+A backup of the vault is only as good as your ability to open it. Test it:
+point \cmd{--vault} at the backup copy and run \cmd{vault list} now and then.
+\end{headsup}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item Locking is automatic. Writers take turns; readers share.
+  \item Sync across machines freely, but write on one machine at a time.
+  \item Back up the folder and the key, separately. Test the backup.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Under the hood}
+\tagline{the cryptography, the file layout, and exactly what a thief learns}
+
+\begin{tldr}
+Each file gets its own random 256-bit key, wrapped with a hybrid of FrodoKEM
+and ML-KEM, and is encrypted in authenticated 64\,KiB chunks. Catalogue
+entries are padded to one fixed size, file contents to power-of-two buckets,
+and every timestamp on disk is set to 1970. An attacker learns roughly how
+much you store. They can delete or roll back entries, but not read or forge them.
+\end{tldr}
+
+\section{The cryptography}
+
+\begin{vtable}{>{\semibold}p{38mm}Y}
+\thead{JOB} & \thead{HOW} \\ \midrule
+Protecting your key & Argon2id (3 passes, 64\,MiB, 4 lanes) turns the passphrase into a key that seals your identity with XChaCha20-Poly1305. \\
+Your identity & A 32-byte seed from which the FrodoKEM-640 and ML-KEM-768 key pairs are derived. \\
+Per-file key & 256 random bits, fresh for every single entry. \\
+Wrapping that key & FrodoKEM-640 \emph{and} ML-KEM-768 encapsulations, combined with HKDF-SHA-256 into one key-encryption key, then ChaCha20-Poly1305. \\
+Header integrity & HMAC-SHA-256 under the per-file key. \\
+The contents & ChaCha20-Poly1305 in a STREAM construction: 64\,KiB chunks, each authenticated, with the last one marked so truncation is caught. \\
+\end{vtable}
+
+\begin{whyso}
+\textbf{Why two post-quantum algorithms?} ML-KEM is the new standard,
+efficient and heavily analysed. FrodoKEM is slower and bulkier, but rests on
+older, more conservative maths. Combining them means a breakthrough against
+either one alone isn't enough.
+\end{whyso}
+
+\section{What's in the folder}
+
+\begin{center}
+\begin{tikzpicture}[
+  dir/.style={font=\small\ttfamily\color{vskydeep},anchor=west},
+  f/.style={font=\small\ttfamily\color{vtext},anchor=west},
+  note/.style={font=\footnotesize\color{vslate},anchor=west},
+  tree/.style={draw=vslate!45,line width=0.8pt}]
+  \node[dir] (root) at (0,0) {\tld/.vault/store/};
+  \node[f] (m) at (0.6,-0.7) {.vault};      \node[note] at (4.2,-0.7) {marker: ``VAULT 1''};
+  \node[f] (l) at (0.6,-1.3) {.lock};       \node[note] at (4.2,-1.3) {lock file, always empty};
+  \node[dir] (r) at (0.6,-1.9) {records/};  \node[note] at (4.2,-1.9) {one encrypted catalogue entry per file};
+  \node[f] (r1) at (1.2,-2.5) {0f1170a6\ldots}; \node[note] at (4.2,-2.5) {every one exactly 18,704 bytes};
+  \node[dir] (o) at (0.6,-3.1) {objects/};  \node[note] at (4.2,-3.1) {one encrypted file body per file};
+  \node[f] (o1) at (1.2,-3.7) {3e78275e\ldots}; \node[note] at (4.2,-3.7) {64\,KiB, 128\,KiB, 256\,KiB\ldots\ never in between};
+  \draw[tree] (0.3,-0.25) |- (m.west); \draw[tree] (0.3,-0.7) |- (l.west); \draw[tree] (0.3,-1.3) |- (r.west);
+  \draw[tree] (0.3,-1.9) |- (o.west);
+  \draw[tree] (0.9,-2.15) |- (r1.west); \draw[tree] (0.9,-3.35) |- (o1.west);
+\end{tikzpicture}
+\end{center}
+
+A \hl{record} holds one file's name, size, permissions, dates and the ID of
+its object. It's padded to 4096 bytes before encryption, so every record is
+the same size whatever the name. An \hl{object} holds the file's contents,
+prefixed with its own ID and padded with random bytes up to the next power
+of two, at least 64\,KiB.
+
+\shot{on-disk}{Random names, identical sizes, and all ``modified'' at the dawn of Unix time}
+
+\section{What an attacker learns}
+
+\begin{vtable}{Y>{\centering\arraybackslash}p{22mm}}
+\thead{SOMEONE WITH A COPY OF YOUR VAULT FOLDER\ldots} & \thead{CAN THEY?} \\ \midrule
+Read any file's contents & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Learn file names or folder names & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Learn exact file sizes & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Learn when a file was created or changed & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Tell real entries from decoy or filler & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Alter a file without it being detected & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Swap one file's contents for another's & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Count entries, and see rough size buckets & \textcolor{vamberdeep}{\faIcon{check}\ yes} \\
+See that the folder changed between two copies & \textcolor{vamberdeep}{\faIcon{check}\ yes} \\
+Delete entries & \textcolor{vcoraldeep}{\faIcon{check}\ yes} \\
+Put back an older copy of an entry (roll back) & \textcolor{vcoraldeep}{\faIcon{check}\ yes} \\
+\end{vtable}
+
+\begin{headsup}
+\textbf{Deletion and rollback aren't detectable.} vault can prove a file is
+exactly what you stored, but not that it's the \emph{latest} thing you stored.
+If the storage isn't under your control, keep an independent backup.
+\end{headsup}
+
+\section{What happens during \texttt{add}}
+
+\begin{steps}
+  \item Read your file and encrypt its contents, plus random padding, to a
+        hidden temporary file in \file{objects/}.
+  \item Give it its random name. It's now safely stored, but nothing refers to it.
+  \item Encrypt a record pointing at it, the same way, into \file{records/}.
+  \item Only then, delete any older version of the same name.
+\end{steps}
+
+Interrupt it anywhere and the worst case is an orphaned encrypted object that
+nothing points to. You never end up with a record pointing at nothing, or
+without either version.
+
+\begin{squirrel}
+vault's crypto core comes from \emph{Fury}, a larger post-quantum encryption
+toolkit. Peek inside any entry and the first line still reads
+\cmd{fury-encryption.org/v1}. That's the format header, kept on purpose:
+changing working, well-tested cryptographic formats for aesthetic reasons
+is how bugs get in.
+\end{squirrel}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item Hybrid post-quantum key wrapping, per-file keys, authenticated streaming encryption.
+  \item Fixed-size records, power-of-two objects, 1970 timestamps: metadata stays private.
+  \item Tampering is caught. Deletion and rollback are not, so keep backups.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{When things go sideways}
+\tagline{every message vault can show you, and what to do about it}
+
+\begin{tldr}
+Almost every error is one of four things: wrong passphrase, wrong \cmd{--key}
+or \cmd{--vault}, a name typo, or a file already in the way. Check the table.
+Your data is still fine.
+\end{tldr}
+
+\shot{errors}{The usual suspects}
+
+\section{The big table}
+
+\begin{vtable}{>{\ttfamily\footnotesize}p{58mm}Y}
+\thead{MESSAGE} & \thead{WHAT IT MEANS, AND THE FIX} \\ \midrule
+incorrect passphrase & Typo, Caps Lock, or the wrong key file. Check \cmd{--key} and \env{VAULT\_KEY}. \\
+not a vault key file & \cmd{--key} points at something that isn't a vault key, or the key file is damaged. Use your backup. \\
+open \ldots/key: no such file or directory & No key there yet. Run \cmd{vault genkey}, or point \env{VAULT\_KEY} at yours. \\
+\ldots\ is not a vault; run vault init & Wrong \cmd{--vault} or \env{VAULT\_DIR}, or you haven't run \cmd{init} yet. \\
+\ldots\ is already a vault & You ran \cmd{init} on an existing vault. Nothing was changed. \\
+NAME: not in the vault & Check the exact name with \cmd{vault list}: it's case-sensitive and includes the folder. Or you typed the other passphrase. \\
+\ldots\ already exists & \cmd{get}: the output file exists, so use \cmd{-o}. \cmd{mv}: the new name is taken. \cmd{genkey}: you already have a key. \\
+invalid vault path "\ldots" & Names can't start with \cmd{/} or \cmd{../}, end in \cmd{/}, or contain backslashes or control characters. \\
+\ldots: not a regular file of at most 1\,TiB & You tried to add a device, a socket or a gigantic file. \\
+\ldots\ changed while being added & The file was being written while vault read it. Try again once it's finished. \\
+skipping \ldots: not a regular file & Adding a folder: a symlink or special file was skipped. Everything else went in. \\
+passphrases do not match & The two entries differed. Nothing was created; run it again. \\
+passphrase must not be empty & Blank passphrases aren't allowed, for good reason. \\
+decoy passphrase must differ from the passphrase & The decoy can't be the same as the real one. \\
+VAULT\_PASSPHRASE is set but empty & Unset it, or give it a value. \\
+could not read passphrase (set VAULT\_PASSPHRASE\ldots) & No terminal to ask on, typically cron or CI. Set the variable. \\
+waiting for another vault process to finish & Not an error. Another command is writing; this one continues when it's done. \\
+vault still locked after a minute\ldots & Plan~9 and WebAssembly only. If nothing else is running, delete the file it names. \\
+skipping unreadable record \ldots & A catalogue entry is damaged. Everything else still works; restore \file{records/} from backup to recover that file. \\
+object does not match its catalogue record & The encrypted contents were swapped or damaged. Nothing was written. Restore \file{objects/} from backup. \\
+object size does not match its catalogue record & Same as above: damage or tampering, caught before any output appeared. \\
+cannot find home directory; set VAULT\_KEY & Unusual environments only. Set \env{VAULT\_KEY} and \env{VAULT\_DIR}. \\
+unknown command / wrong number of arguments & A typo in the command itself. The usage text follows. \\
+\end{vtable}
+
+\section{``My files have vanished!''}
+
+Deep breath. Nine times out of ten, one of these:
+
+\begin{checks}
+  \item \textbf{You typed the other passphrase.} The decoy and real sides are
+        separate worlds. Try the other one.
+  \item \textbf{You're looking at a different vault.} Check \cmd{--vault} and
+        \env{VAULT\_DIR}. Is this the vault you think it is?
+  \item \textbf{You're looking in a folder.} \cmd{vault list letters} only
+        shows what's under \file{letters/}.
+\end{checks}
+
+\section{Interrupted in the middle of something?}
+
+Power cut, closed laptop, \keycap{Ctrl}+\keycap{C}. It's fine. vault writes
+new data first and removes old data last, so an interruption leaves the vault
+consistent. At worst there's an orphaned encrypted object, or a temporary
+file starting \file{.pending-}. Both are harmless and both are safe to delete.
+
+\begin{danger}
+\textbf{The one thing that can't be fixed:} a lost key file or a forgotten
+passphrase. Nothing in this chapter helps with that. Back up your key.
+\end{danger}
+
+\begin{pocket}
+\begin{pocketlist}
+  \item Most errors mean a wrong passphrase, key, vault or name.
+  \item ``Missing'' files usually mean the other passphrase or another vault.
+  \item Interruptions are safe. Lost keys are not.
+\end{pocketlist}
+\end{pocket}
+
+% ======================================================================
+\chapter{Cheat sheet}
+\tagline{the whole tool at a glance. print it, pin it up}
+
+\begin{tcbraster}[raster columns=2,raster equal height=rows,raster column skip=8pt,raster row skip=8pt,
+  enhanced,colback=vmist,colframe=vline,boxrule=0.4pt,arc=4pt,left=9pt,right=9pt,top=7pt,bottom=7pt]
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault genkey}\\[2pt]\small Make a key. Asks for a passphrase and an optional decoy.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault init}\\[2pt]\small Make an empty vault, with filler.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault add FILE|DIR [FOLDER]}\\[2pt]\small Encrypt in, keeping the name. Replaces an existing name.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Size, modified time and name, sorted.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get NAME [-o OUT]}\\[2pt]\small Decrypt out. Never overwrites. Verifies first.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename, using the full new name. Instant.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm NAME}\\[2pt]\small Delete one file. No undo.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault help}\\[2pt]\small Show the command summary.\end{tcolorbox}
+\end{tcbraster}
+
+\section*{Options and variables}
+\begin{vtable}{>{\ttfamily\small}p{40mm}>{\leavevmode\ttfamily\small\color{vvioletdeep}}p{48mm}Y}
+\thead{FLAG} & \thead{VARIABLE} & \thead{DEFAULT} \\ \midrule
+--key PATH & VAULT\_KEY & \file{\tld/.vault/key} \\
+--vault DIR & VAULT\_DIR & \file{\tld/.vault/store} \\
+\textrm{(prompt)} & VAULT\_PASSPHRASE & asked on the terminal \\
+\textrm{(genkey prompt)} & VAULT\_DECOY\_PASSPHRASE & asked; empty means none \\
+-o OUT & \textrm{---} & the file's own name, here \\
+\end{vtable}
+
+\section*{Numbers worth knowing}
+\begin{vtable}{Y>{\raggedleft\arraybackslash}p{40mm}}
+\thead{THING} & \thead{VALUE} \\ \midrule
+Largest file & 1\,TiB \\
+Longest stored name & 1024 bytes \\
+Smallest object on disk & 64\,KiB \\
+Filler entries in a new vault & 8 to 32 \\
+Key file size & 319 bytes \\
+Exit codes & 0 ok, 1 error, 2 no command \\
+\end{vtable}
+
+% ======================================================================
+\appendix
+\vappendixtrue
+
+\chapter{Glossary}
+
+\begin{description}[style=nextline,leftmargin=0pt,font=\displaybold\color{vink},itemsep=4pt]
+  \item[Argon2id] A deliberately slow, memory-hard function that turns your passphrase into a key, making guessing expensive.
+  \item[Catalogue] The encrypted list of what's in your vault, stored as one record per file.
+  \item[Decoy passphrase] A second passphrase that opens a separate, harmless set of files.
+  \item[Entry] One record plus its object. Real, decoy and filler entries all look identical on disk.
+  \item[Filler] Entries sealed to a key that was immediately destroyed. Nobody can open them. They make the decoy plausible.
+  \item[FrodoKEM, ML-KEM] Post-quantum key-encapsulation algorithms. vault uses both at once.
+  \item[Key file] The small file holding your identity, encrypted under your passphrase (and decoy).
+  \item[Object] The encrypted contents of one file, padded to a power-of-two size.
+  \item[Post-quantum] Designed to stay secure against attackers with large quantum computers.
+  \item[Record] The encrypted catalogue entry for one file: its name, size, dates and object ID.
+  \item[Vault] The folder where your encrypted files live.
+\end{description}
+
+\chapter{About this guide}
+
+This guide lives in \file{docs/guide} and builds itself.
+
+\begin{shell}
+$ ./build-pdf.sh    # makes vault-guide.pdf (downloads Tectonic if needed)
+$ ./shots.py        # re-shoots every screenshot from the real vault binary
+\end{shell}
+
+Every screenshot is real output from the \cmd{vault} program built from the
+same source code, run in a throwaway home folder. The only touch-ups: the home
+folder is shown as \file{/home/sam}, some lines are highlighted in amber
+so they're easier to spot, and the two ``waiting for your passphrase'' shots
+are frozen at that moment.
+
+% ======================================================================
+\backmatter
+\clearpage
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+  \shade[top color=vink,bottom color=vnavy] (current page.north west) rectangle (current page.south east);
+  \vaultdoor{($(current page.center)+(0,30mm)$)}{38}
+  \node[font=\displayblack\fontsize{40}{40}\selectfont,text=white] at ([yshift=-38mm]current page.center) {That's it.};
+  \node[font=\lightfont\fontsize{15}{20}\selectfont,text=white!80!vteal,align=center] at ([yshift=-56mm]current page.center)
+    {Go encrypt something.\\ (And back up your key.)};
+\end{tikzpicture}
+
+\end{document}
