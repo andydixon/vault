@@ -35,7 +35,7 @@ find_tectonic() {
 tectonic=$(find_tectonic)
 
 # The cover shows the git version and today's date.
-version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+version=$(git describe --tags --match '[0-9]*' --always --dirty 2>/dev/null || echo dev)
 printf '\\newcommand\\vaultversion{%s}\n\\newcommand\\vaultdate{%s}\n' \
 	"$version" "$(date '+%B %Y')" >version.tex
 
