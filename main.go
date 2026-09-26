@@ -46,7 +46,12 @@ const (
 	decoyEnv      = "VAULT_DECOY_PASSPHRASE"
 )
 
+// unlock releases the vault lock taken by open. fail calls it too, because
+// os.Exit skips deferred calls.
+var unlock = func() {}
+
 func main() {
+	defer func() { unlock() }()
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
@@ -90,7 +95,7 @@ func main() {
 		if len(pos) == 2 {
 			dest = strings.Trim(pos[1], "/")
 		}
-		s := open(*keyPath, *vaultDir)
+		s := open(*keyPath, *vaultDir, true)
 		cat, err := s.catalogue()
 		check(err)
 		check(addPath(s, cat, pos[0], dest))
@@ -100,7 +105,7 @@ func main() {
 		if len(pos) == 1 {
 			prefix = strings.Trim(pos[0], "/")
 		}
-		cat, err := open(*keyPath, *vaultDir).catalogue()
+		cat, err := open(*keyPath, *vaultDir, false).catalogue()
 		check(err)
 		list(cat, prefix)
 	case "get":
@@ -109,13 +114,13 @@ func main() {
 		if out == "" {
 			out = path.Base(pos[0])
 		}
-		check(open(*keyPath, *vaultDir).get(pos[0], out))
+		check(open(*keyPath, *vaultDir, false).get(pos[0], out))
 	case "mv", "rename":
 		want(2, 2)
-		check(open(*keyPath, *vaultDir).rename(pos[0], pos[1]))
+		check(open(*keyPath, *vaultDir, true).rename(pos[0], pos[1]))
 	case "rm", "delete":
 		want(1, 1)
-		check(open(*keyPath, *vaultDir).delete(pos[0]))
+		check(open(*keyPath, *vaultDir, true).delete(pos[0]))
 	case "help", "-h", "--help":
 		fmt.Println(usage)
 	default:
@@ -150,12 +155,16 @@ func defaultPath(env, name string) string {
 	return filepath.Join(home, ".vault", name)
 }
 
-func open(keyPath, vaultDir string) *store {
+// open unlocks the key and opens the vault, holding the vault lock
+// exclusively for writers and shared for readers.
+func open(keyPath, vaultDir string, exclusive bool) *store {
 	pass, err := term.ReadPassphrase("Enter passphrase:", passphraseEnv)
 	check(err)
 	id, err := unlockKeyFile(keyPath, pass)
 	check(err)
 	s, err := openStore(vaultDir, id)
+	check(err)
+	unlock, err = lockVault(vaultDir, exclusive)
 	check(err)
 	return s
 }
@@ -271,6 +280,7 @@ func check(err error) {
 }
 
 func fail(format string, args ...any) {
+	unlock()
 	fmt.Fprintf(os.Stderr, "vault: "+format+"\n", args...)
 	os.Exit(1)
 }

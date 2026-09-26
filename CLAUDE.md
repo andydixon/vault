@@ -14,6 +14,11 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 - `store.go` - on-disk vault: `records/` holds fixed-size encrypted catalogue
   records, `objects/` holds padded encrypted file bodies. Records a key cannot
   open are skipped, not treated as errors.
+- `lock*.go` - vault lock on `DIR/.lock`: fcntl on unix, LockFileEx on
+  Windows, an exclusive lock file elsewhere. Writers lock exclusively,
+  readers shared, taken after the passphrase prompt.
+- `build.sh` - cross-compiles every `go tool dist list` target except
+  iOS and android/386, amd64, arm (cgo-only).
 - `internal/pqcrypt` - file encryption (header + STREAM ChaCha20-Poly1305),
   suite registry, hybrid FrodoKEM-640 + ML-KEM-768 default suite.
 - `internal/format`, `internal/stream`, `internal/term` - header encoding,
@@ -24,6 +29,8 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 ```sh
 go test ./...
 go build .
+./build.sh                                  # all platforms, into ./dist
+TARGETS="linux/amd64" ./build.sh            # a subset
 ```
 
 End-to-end check:
@@ -43,5 +50,6 @@ export VAULT_PASSPHRASE=test VAULT_KEY=$PWD/k VAULT_DIR=$PWD/s
 - `get` publishes output only after the entire object has authenticated.
 - Decoy deniability: both key slots stay the same size and are both always
   tried; `init` always writes filler; foreign records are skipped silently.
-- Keep dependencies pure Go.
+- Every command that changes the vault holds the exclusive lock.
+- Keep dependencies pure Go and CGO_ENABLED=0 builds working.
 - Diagnostics go to standard error, lower-case, no trailing full stops.

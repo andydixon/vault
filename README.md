@@ -13,7 +13,13 @@ buckets.
 ```sh
 go build .        # produces ./vault
 go test ./...
+./build.sh        # every OS and CPU architecture, into ./dist
 ```
+
+`build.sh` cross-compiles static binaries for every target in
+`go tool dist list` except iOS and 32-bit or x86 Android, which need cgo. It builds 32-bit ARM Linux for
+both armv6 and armv7, and writes `dist/SHA256SUMS`. Set `TARGETS` to build a
+subset, for example `TARGETS="linux/amd64 darwin/arm64" ./build.sh`.
 
 ## Use
 
@@ -30,6 +36,13 @@ vault get report.pdf -o copy.pdf
 vault mv report.pdf old/report.pdf
 vault rm old/report.pdf
 ```
+
+Commands that change the vault take an exclusive lock on `DIR/.lock`, and
+commands that read it take a shared one. A second process waits, and says
+so, until the first finishes. The operating system releases the lock if a
+process dies. Plan 9 and WebAssembly have no file locks, so there the lock
+file itself is the lock. After a crash on those platforms you remove it by
+hand; the error message names it.
 
 Adding a name that already exists replaces it. `get` refuses to overwrite an
 existing file and writes nothing until the whole object has authenticated.
@@ -67,7 +80,6 @@ vault over time can still see it grow when real files are added.
 
 ## Limits
 
-- One writer at a time. Concurrent writes to the same vault are not locked.
 - The storage host can see how many files exist, their size buckets and when
   the vault changes.
 - The key file is the only way in. Losing it or its passphrase loses the data.

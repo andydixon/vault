@@ -4,10 +4,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestKeyFile(t *testing.T) {
@@ -127,5 +131,47 @@ func TestDecoy(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Join(dir, "store", recordsDir))
 	if len(entries) < fillerMin+2 {
 		t.Fatalf("only %d records; filler missing", len(entries))
+	}
+}
+
+// TestLockExcludesOtherProcess runs a copy of the test binary that holds the
+// exclusive lock, then checks this process has to wait for it.
+func TestLockExcludesOtherProcess(t *testing.T) {
+	if dir := os.Getenv("VAULT_TEST_LOCK_HOLDER"); dir != "" {
+		release, err := lockVault(dir, true)
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Stdout.WriteString("locked\n")
+		io.Copy(io.Discard, os.Stdin) // hold until the parent closes stdin
+		release()
+		os.Exit(0)
+	}
+	dir := t.TempDir()
+	holder := exec.Command(os.Args[0], "-test.run=^TestLockExcludesOtherProcess$")
+	holder.Env = append(os.Environ(), "VAULT_TEST_LOCK_HOLDER="+dir)
+	stdin, _ := holder.StdinPipe()
+	stdout, _ := holder.StdoutPipe()
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Wait()
+	if line, _ := bufio.NewReader(stdout).ReadString('\n'); line != "locked\n" {
+		t.Fatalf("holder said %q", line)
+	}
+	waited := make(chan bool, 1)
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		stdin.Close() // let the holder go only after we have started waiting
+	}()
+	for _, exclusive := range []bool{false, true} {
+		release, err := acquireLock(filepath.Join(dir, lockName), exclusive, func() { waited <- true })
+		if err != nil {
+			t.Fatal(err)
+		}
+		release()
+		if !exclusive && len(waited) == 0 {
+			t.Fatal("shared lock did not wait for the exclusive holder")
+		}
 	}
 }
