@@ -8,8 +8,9 @@ vault is a post-quantum encrypted file vault: one `package main` at the repo
 root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 
 - `main.go` - CLI: `genkey`, `init`, `add`, `list`, `get`, `mv`, `rm`.
-- `keyfile.go` - passphrase-protected key file (Argon2id +
-  XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed).
+- `keyfile.go` - key file with two passphrase slots (Argon2id +
+  XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
+  slot is either a decoy identity or random bytes; slot order is random.
 - `store.go` - on-disk vault: `records/` holds fixed-size encrypted catalogue
   records, `objects/` holds padded encrypted file bodies. Records a key cannot
   open are skipped, not treated as errors.
@@ -40,5 +41,7 @@ export VAULT_PASSPHRASE=test VAULT_KEY=$PWD/k VAULT_DIR=$PWD/s
   size; objects stay bucket-padded. These hide metadata from the storage host.
 - An object's plaintext starts with its own ID, binding it to its record.
 - `get` publishes output only after the entire object has authenticated.
+- Decoy deniability: both key slots stay the same size and are both always
+  tried; `init` always writes filler; foreign records are skipped silently.
 - Keep dependencies pure Go.
 - Diagnostics go to standard error, lower-case, no trailing full stops.

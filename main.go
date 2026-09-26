@@ -32,9 +32,19 @@ Options (any command):
     --key PATH     key file (default $VAULT_KEY, else ~/.vault/key)
     --vault DIR    vault directory (default $VAULT_DIR, else ~/.vault/store)
 
-The passphrase is read from the terminal, or from $VAULT_PASSPHRASE.`
+The passphrase is read from the terminal, or from $VAULT_PASSPHRASE.
 
-const passphraseEnv = "VAULT_PASSPHRASE"
+Decoy passphrase: genkey offers a second, optional passphrase
+($VAULT_DECOY_PASSPHRASE when scripted). It unlocks a separate key, so
+every command run with it sees and changes only the decoy files, and the
+real files stay invisible. The key file does not reveal whether a decoy
+exists, and init fills each vault with unreadable filler, so hidden
+files look like filler to anyone holding only the decoy passphrase.`
+
+const (
+	passphraseEnv = "VAULT_PASSPHRASE"
+	decoyEnv      = "VAULT_DECOY_PASSPHRASE"
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -64,7 +74,11 @@ func main() {
 			fail("%s already exists", *keyPath)
 		}
 		pass := newPassphrase("passphrase")
-		check(writeKeyFile(*keyPath, pass))
+		decoy := decoyPassphrase()
+		if decoy == pass {
+			fail("decoy passphrase must differ from the passphrase")
+		}
+		check(writeKeyFile(*keyPath, pass, decoy))
 		fmt.Fprintf(os.Stderr, "key written to %s\n", *keyPath)
 	case "init":
 		want(0, 0)
@@ -161,6 +175,27 @@ func newPassphrase(what string) string {
 		fail("%ss do not match", what)
 	}
 	return p
+}
+
+// decoyPassphrase asks for an optional second passphrase. Empty means none.
+func decoyPassphrase() string {
+	if p, ok := os.LookupEnv(decoyEnv); ok {
+		return p
+	}
+	if _, ok := os.LookupEnv(passphraseEnv); ok {
+		return "" // non-interactive run without a decoy
+	}
+	p, err := term.ReadSecret("Enter decoy passphrase (empty for none):")
+	check(err)
+	if len(p) == 0 {
+		return ""
+	}
+	again, err := term.ReadSecret("Confirm decoy passphrase:")
+	check(err)
+	if string(p) != string(again) {
+		fail("decoy passphrases do not match")
+	}
+	return string(p)
 }
 
 // addPath adds a file, or every regular file under a directory, beneath dest.

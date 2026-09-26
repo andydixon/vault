@@ -44,6 +44,8 @@ const (
 	fileLimit     = int64(1) << 40
 	minPadding    = int64(64 << 10)
 	idSize        = 16
+	fillerMin     = 8
+	fillerMax     = 32
 )
 
 type record struct {
@@ -58,8 +60,9 @@ type record struct {
 }
 
 type store struct {
-	root string
-	id   *pqcrypt.PQIdentity
+	root   string
+	id     *pqcrypt.PQIdentity
+	noSync bool // filler needs no per-file durability
 }
 
 func initStore(root string) error {
@@ -71,7 +74,50 @@ func initStore(root string) error {
 			return err
 		}
 	}
+	if err := writeFiller(root); err != nil {
+		return err
+	}
 	return os.WriteFile(filepath.Join(root, markerName), []byte(markerContent), 0o600)
+}
+
+// writeFiller stores a random number of record/object pairs sealed to a key
+// that is thrown away. Every vault therefore holds entries nobody can open,
+// so a file hidden from a decoy passphrase is indistinguishable from filler.
+func writeFiller(root string) error {
+	throwaway, err := pqcrypt.GeneratePQIdentity()
+	if err != nil {
+		return err
+	}
+	defer throwaway.Close()
+	s := &store{root: root, id: throwaway, noSync: true}
+	var b [2]byte
+	if _, err := rand.Read(b[:1]); err != nil {
+		return err
+	}
+	for range fillerMin + int(b[0])%(fillerMax-fillerMin+1) {
+		if _, err := rand.Read(b[:]); err != nil {
+			return err
+		}
+		// Object buckets from 64 KiB to 4 MiB, weighted towards small ones.
+		objSize := minPadding << (min(b[0]%8, b[1]%8) % 7)
+		for _, part := range []struct {
+			dir  string
+			size int64
+		}{{recordsDir, recordSize}, {objectsDir, objSize}} {
+			id, err := randomID()
+			if err != nil {
+				return err
+			}
+			err = s.writeCiphertext(part.dir, id, func(w io.Writer) error {
+				_, err := io.CopyN(w, rand.Reader, part.size)
+				return err
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func openStore(root string, id *pqcrypt.PQIdentity) (*store, error) {
@@ -137,8 +183,10 @@ func (s *store) writeCiphertext(dir, id string, write func(io.Writer) error) err
 	if err := w.Close(); err != nil {
 		return err
 	}
-	if err := tmp.Sync(); err != nil {
-		return err
+	if !s.noSync {
+		if err := tmp.Sync(); err != nil {
+			return err
+		}
 	}
 	if err := tmp.Close(); err != nil {
 		return err
@@ -147,7 +195,7 @@ func (s *store) writeCiphertext(dir, id string, write func(io.Writer) error) err
 	if err := os.Chtimes(tmp.Name(), epoch, epoch); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp.Name(), filepath.Join(dir, id)); err != nil {
+	if err := os.Rename(tmp.Name(), filepath.Join(dir, id)); err != nil || s.noSync {
 		return err
 	}
 	return syncDir(dir)

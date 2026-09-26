@@ -12,7 +12,7 @@ import (
 
 func TestKeyFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "key")
-	if err := writeKeyFile(path, "pass"); err != nil {
+	if err := writeKeyFile(path, "pass", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := unlockKeyFile(path, "wrong"); err == nil {
@@ -39,7 +39,7 @@ func newTestStore(t *testing.T, keyPath, pass string) *store {
 func TestStoreLifecycle(t *testing.T) {
 	dir := t.TempDir()
 	keyPath := filepath.Join(dir, "key")
-	if err := writeKeyFile(keyPath, "pass"); err != nil {
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := initStore(filepath.Join(dir, "store")); err != nil {
@@ -92,5 +92,40 @@ func TestStoreLifecycle(t *testing.T) {
 	}
 	if cat, _ = s.catalogue(); len(cat) != 1 {
 		t.Fatalf("after delete: %v", cat)
+	}
+}
+
+func TestDecoy(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "real", "decoy"); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store")); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "in")
+	os.WriteFile(src, []byte("data"), 0o600)
+	real, decoy := newTestStore(t, keyPath, "real"), newTestStore(t, keyPath, "decoy")
+	for s, name := range map[*store]string{real: "secret", decoy: "shopping"} {
+		cat, err := s.catalogue()
+		if err != nil || len(cat) != 0 {
+			t.Fatalf("fresh vault catalogue = %v, %v", cat, err)
+		}
+		if _, err := s.add(cat, src, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for s, name := range map[*store]string{real: "secret", decoy: "shopping"} {
+		if cat, _ := s.catalogue(); len(cat) != 1 || cat[name] == nil {
+			t.Fatalf("catalogue = %v, want only %s", cat, name)
+		}
+	}
+	if _, err := unlockKeyFile(keyPath, "neither"); err == nil {
+		t.Fatal("wrong passphrase unlocked the key")
+	}
+	entries, _ := os.ReadDir(filepath.Join(dir, "store", recordsDir))
+	if len(entries) < fillerMin+2 {
+		t.Fatalf("only %d records; filler missing", len(entries))
 	}
 }

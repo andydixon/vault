@@ -39,6 +39,32 @@ existing file and writes nothing until the whole object has authenticated.
 The passphrase is read from the terminal, or from `$VAULT_PASSPHRASE` for
 scripts.
 
+## Decoy passphrase
+
+`vault genkey` offers an optional second passphrase. In scripts, set
+`$VAULT_DECOY_PASSPHRASE`. Each passphrase unlocks its own key, so a command
+run with the decoy passphrase lists, adds and retrieves only decoy files. The
+real files never appear.
+
+```sh
+vault genkey                          # set a passphrase, then a decoy passphrase
+vault add plans.pdf                   # with the real passphrase
+vault add shopping.txt                # with the decoy passphrase
+vault list                            # shows only what that passphrase stored
+```
+
+Two measures keep the real files deniable:
+
+- The key file always holds two slots of identical size in random order. An
+  unused slot is random bytes, so the file does not show whether a decoy
+  exists or which slot is real.
+- `init` fills every vault with 8 to 32 random entries that nobody can
+  decrypt. Anyone holding only the decoy passphrase sees unreadable entries in
+  every vault, so hidden real files look the same as filler.
+
+A decoy can only be set when the key is created. Someone who watches the
+vault over time can still see it grow when real files are added.
+
 ## Limits
 
 - One writer at a time. Concurrent writes to the same vault are not locked.
