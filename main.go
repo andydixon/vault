@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/andydixon/vault/internal/term"
@@ -20,7 +21,8 @@ import (
 
 const usage = `Usage:
     vault genkey                    create a new passphrase-protected key
-    vault init                      create a new, empty vault
+    vault init [--filler SIZE]      create a new, empty vault, with at least
+                                    SIZE of filler (e.g. 500M, 2G)
     vault add FILE|DIR [FOLDER]     encrypt a file or directory into the vault,
                                     optionally under a folder inside the vault
     vault list [PREFIX]             list stored files
@@ -62,6 +64,7 @@ func main() {
 	keyPath := fset.String("key", defaultPath("VAULT_KEY", "key"), "")
 	vaultDir := fset.String("vault", defaultPath("VAULT_DIR", "store"), "")
 	output := fset.String("o", "", "")
+	filler := fset.String("filler", "0", "")
 	pos, err := parseInterleaved(fset, args)
 	if err != nil {
 		fail("%v\n\n%s", err, usage)
@@ -87,7 +90,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "key written to %s\n", *keyPath)
 	case "init":
 		want(0, 0)
-		check(initStore(*vaultDir))
+		size, err := parseSize(*filler)
+		check(err)
+		check(initStore(*vaultDir, size))
 		fmt.Fprintf(os.Stderr, "vault created at %s\n", *vaultDir)
 	case "add":
 		want(1, 2)
@@ -142,6 +147,22 @@ func parseInterleaved(fset *flag.FlagSet, args []string) ([]string, error) {
 		pos = append(pos, fset.Arg(0))
 		args = fset.Args()[1:]
 	}
+}
+
+// parseSize reads a byte count with an optional K, M, G or T suffix, in
+// powers of 1024.
+func parseSize(s string) (int64, error) {
+	num, shift := strings.TrimSuffix(strings.ToUpper(s), "B"), 0
+	for i, unit := range "KMGT" {
+		if strings.HasSuffix(num, string(unit)) {
+			num, shift = strings.TrimSuffix(num, string(unit)), 10*(i+1)
+		}
+	}
+	n, err := strconv.ParseInt(num, 10, 64)
+	if err != nil || n < 0 || n > fileLimit>>shift {
+		return 0, fmt.Errorf("invalid size %q", s)
+	}
+	return n << shift, nil
 }
 
 func defaultPath(env, name string) string {

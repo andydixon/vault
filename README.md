@@ -5,8 +5,11 @@ A post-quantum encrypted file vault in a single binary.
 Files are encrypted with a hybrid FrodoKEM-640 + ML-KEM-768 key encapsulation
 and ChaCha20-Poly1305. The vault directory holds only randomly named
 ciphertexts. Names, sizes, modes and timestamps live inside encrypted
-catalogue records of one fixed size. File bodies are padded to power-of-two
-buckets.
+catalogue records of one fixed size. File bodies are cut into 4 MiB objects,
+the last padded to a power-of-two bucket, so every object is 64 KiB to 4 MiB
+whatever the file's size. Object names derive from a secret seed in the
+record, so nothing on disk links a file's pieces. Records and objects are
+spread over 256 subfolders (`records/3f/3fa9…`) to keep directories small.
 
 ## Build
 
@@ -32,6 +35,7 @@ A full illustrated guide lives in `docs/guide`. Build the PDF with
 ```sh
 vault genkey                     # create ~/.vault/key, protected by a passphrase
 vault init                       # create ~/.vault/store
+vault init --filler 2G           # the same, with at least 2 GiB of filler
 vault add report.pdf             # stored as report.pdf
 vault add report.pdf work/2026   # stored as work/2026/report.pdf
 vault add ./photos               # every regular file under photos/
@@ -84,10 +88,22 @@ Two measures keep the real files deniable:
 A decoy can only be set when the key is created. Someone who watches the
 vault over time can still see it grow when real files are added.
 
+Default filler is only a few tens of megabytes, so someone holding the decoy
+passphrase can see when far more data than that is unopenable. To hide more,
+create the vault with `vault init --filler SIZE` (`500M`, `2G`, `1T`), at
+least as large as what you will hide. Filler entries are written by the
+same code as real files, with a spread of small and multi-chunk sizes, so
+they look like a real collection. Filler can only be added at `init`;
+added later it would stand out as a burst of new entries.
+
 ## Limits
 
-- The storage host can see how many files exist, their size buckets and when
-  the vault changes.
+- The storage host can see how many records and objects exist, so roughly
+  how much is stored, and when the vault changes. Chunking hides a file's
+  size in any single snapshot, but objects written together can be grouped
+  by anyone watching the folder or a sync service's upload log.
+- Padding still costs space: small files round up to a 64 KiB-or-larger
+  bucket and a big file's last piece to its bucket, at most 4 MiB per file.
 - The key file is the only way in. Losing it or its passphrase loses the data.
 
 ## Licence

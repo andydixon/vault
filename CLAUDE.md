@@ -12,7 +12,9 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
   XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
   slot is either a decoy identity or random bytes; slot order is random.
 - `store.go` - on-disk vault: `records/` holds fixed-size encrypted catalogue
-  records, `objects/` holds padded encrypted file bodies. Records a key cannot
+  records, `objects/` holds file bodies cut into 4 MiB chunks (last one
+  bucket-padded) whose IDs are HMAC'd from a per-record seed. Both are
+  sharded into 256 `xx/` subdirectories by ID prefix. Records a key cannot
   open are skipped, not treated as errors.
 - `lock*.go` - vault lock on `DIR/.lock`: fcntl on unix, LockFileEx on
   Windows, an exclusive lock file elsewhere. Writers lock exclusively,
@@ -46,10 +48,12 @@ export VAULT_PASSPHRASE=test VAULT_KEY=$PWD/k VAULT_DIR=$PWD/s
 
 - Never write a seed or private key unencrypted.
 - Keep suite IDs, stanza tags, HKDF info strings and `fileKeySize` (32) stable.
-- Every ciphertext's mtime is pinned to the epoch; records stay one fixed
-  size; objects stay bucket-padded. These hide metadata from the storage host.
-- An object's plaintext starts with its own ID, binding it to its record.
-- `get` publishes output only after the entire object has authenticated.
+- Every ciphertext's and shard directory's mtime is pinned to the epoch;
+  records stay one fixed size; objects stay at most 4 MiB and bucket-padded.
+  These hide metadata from the storage host.
+- An object's plaintext starts with its own ID, binding it to its record
+  and its position in the file.
+- `get` publishes output only after every object has authenticated.
 - Decoy deniability: both key slots stay the same size and are both always
   tried; `init` always writes filler; foreign records are skipped silently.
 - Every command that changes the vault holds the exclusive lock.

@@ -232,7 +232,7 @@ def main():
     t = Term(box)
     t.cmd("vault init")
     t.cmd("ls -A ~/.vault/store/")
-    t.cmd("ls ~/.vault/store/records | wc -l")
+    t.cmd("find ~/.vault/store/records -type f | wc -l")
     shoot("init", t)
 
     t = Term(box)
@@ -261,7 +261,7 @@ def main():
     shoot("mv-rm", t)
 
     t = Term(box, title="sam@laptop: ~/.vault/store")
-    t.cmd("cd .vault/store && ls -l records | head -5", cwd="~/.vault/store", shown="ls -l records | head -5")
+    t.cmd("cd .vault/store && ls -l records/*/* | head -5", cwd="~/.vault/store", shown="ls -l records/*/* | head -5")
     shoot("on-disk", t)
 
     # decoy: fill the decoy side, then show both views side by side
@@ -275,7 +275,7 @@ def main():
 
     t = Term(box)
     t.cmd("vault get ideas/notes.md -o /tmp/x.md", D, highlight=("not in the vault",))
-    t.cmd("ls ~/.vault/store/records | wc -l")
+    t.cmd("find ~/.vault/store/records -type f | wc -l")
     shoot("decoy-hidden", t)
 
     # errors

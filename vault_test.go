@@ -6,7 +6,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +48,7 @@ func TestStoreLifecycle(t *testing.T) {
 	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := initStore(filepath.Join(dir, "store")); err != nil {
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
 		t.Fatal(err)
 	}
 	s := newTestStore(t, keyPath, "pass")
@@ -84,9 +86,8 @@ func TestStoreLifecycle(t *testing.T) {
 	// Swapping one object for another must be detected.
 	cat, _ = s.catalogue()
 	d, c := cat["d"][0], cat["c"][0]
-	objects := filepath.Join(s.root, objectsDir)
-	data, _ := os.ReadFile(filepath.Join(objects, c.Object))
-	os.WriteFile(filepath.Join(objects, d.Object), data, 0o600)
+	data, _ := os.ReadFile(s.path(objectsDir, objectID(c.Seed, 0)))
+	os.WriteFile(s.path(objectsDir, objectID(d.Seed, 0)), data, 0o600)
 	if err := s.get("d", filepath.Join(dir, "swapped")); err == nil {
 		t.Fatal("swapped object was accepted")
 	}
@@ -105,7 +106,7 @@ func TestDecoy(t *testing.T) {
 	if err := writeKeyFile(keyPath, "real", "decoy"); err != nil {
 		t.Fatal(err)
 	}
-	if err := initStore(filepath.Join(dir, "store")); err != nil {
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
 		t.Fatal(err)
 	}
 	src := filepath.Join(dir, "in")
@@ -128,9 +129,96 @@ func TestDecoy(t *testing.T) {
 	if _, err := unlockKeyFile(keyPath, "neither"); err == nil {
 		t.Fatal("wrong passphrase unlocked the key")
 	}
-	entries, _ := os.ReadDir(filepath.Join(dir, "store", recordsDir))
-	if len(entries) < fillerMin+2 {
-		t.Fatalf("only %d records; filler missing", len(entries))
+	if n := len(ciphertexts(t, filepath.Join(dir, "store", recordsDir))); n < fillerMin+2 {
+		t.Fatalf("only %d records; filler missing", n)
+	}
+}
+
+// ciphertexts maps every file under dir to its size.
+func ciphertexts(t *testing.T, dir string) map[string]int64 {
+	t.Helper()
+	sizes := map[string]int64{}
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		info, err := d.Info()
+		sizes[p] = info.Size()
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sizes
+}
+
+// TestChunks checks a file bigger than one chunk becomes unlinkable 4 MiB
+// objects plus a bucket-sized tail, all in their shards, and that reordering
+// the chunks is caught.
+func TestChunks(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	objects := filepath.Join(s.root, objectsDir)
+	before := ciphertexts(t, objects)
+
+	src := filepath.Join(dir, "in")
+	want := make([]byte, 2*chunkData+100)
+	rand.Read(want)
+	os.WriteFile(src, want, 0o600)
+	cat, _ := s.catalogue()
+	if _, err := s.add(cat, src, "big"); err != nil {
+		t.Fatal(err)
+	}
+	cat, _ = s.catalogue()
+	r := cat["big"][0]
+	var sizes []int64
+	for i := range objectCount(r.Size) {
+		p := s.path(objectsDir, objectID(r.Seed, i))
+		if filepath.Base(filepath.Dir(p)) != filepath.Base(p)[:2] {
+			t.Fatalf("%s is in the wrong shard", p)
+		}
+		sizes = append(sizes, ciphertexts(t, p)[p])
+	}
+	if len(sizes) != 3 || sizes[0] != sizes[1] || sizes[2] >= sizes[0] {
+		t.Fatalf("object sizes = %v, want two full chunks and a smaller tail", sizes)
+	}
+	if n := len(ciphertexts(t, objects)) - len(before); n != 3 {
+		t.Fatalf("add wrote %d objects, want 3", n)
+	}
+	for p, size := range ciphertexts(t, objects) {
+		if size > sizes[0] {
+			t.Fatalf("%s is %d bytes, larger than a chunk", p, size)
+		}
+	}
+
+	out := filepath.Join(dir, "out")
+	if err := s.get("big", out); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(out); !bytes.Equal(got, want) {
+		t.Fatal("round trip mismatch")
+	}
+
+	a, b := s.path(objectsDir, objectID(r.Seed, 0)), s.path(objectsDir, objectID(r.Seed, 1))
+	os.Rename(a, a+".x")
+	os.Rename(b, a)
+	os.Rename(a+".x", b)
+	if err := s.get("big", filepath.Join(dir, "swapped")); err == nil {
+		t.Fatal("reordered chunks were accepted")
+	}
+
+	if err := s.delete("big"); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(ciphertexts(t, objects)); n != len(before) {
+		t.Fatalf("%d objects after rm, want %d", n, len(before))
 	}
 }
 
@@ -173,5 +261,37 @@ func TestLockExcludesOtherProcess(t *testing.T) {
 		if !exclusive && len(waited) == 0 {
 			t.Fatal("shared lock did not wait for the exclusive holder")
 		}
+	}
+}
+
+func TestParseSize(t *testing.T) {
+	for in, want := range map[string]int64{"0": 0, "512": 512, "2k": 2 << 10, "500M": 500 << 20, "2G": 2 << 30, "1TB": 1 << 40} {
+		if got, err := parseSize(in); err != nil || got != want {
+			t.Errorf("parseSize(%q) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "G", "-1", "2X", "1.5G", "2T"} {
+		if _, err := parseSize(in); err == nil {
+			t.Errorf("parseSize(%q) accepted", in)
+		}
+	}
+}
+
+// TestFiller checks a filler target is met with entries shaped like real
+// files: fixed-size records and objects no bigger than a chunk.
+func TestFiller(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "store")
+	if err := initStore(root, 24<<20); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(ciphertexts(t, filepath.Join(root, recordsDir))); n < fillerMin {
+		t.Fatalf("%d filler records, want at least %d", n, fillerMin)
+	}
+	var total, largest int64
+	for _, size := range ciphertexts(t, filepath.Join(root, objectsDir)) {
+		total, largest = total+size, max(largest, size)
+	}
+	if total < 24<<20 || largest > chunkSize+chunkSize/64 {
+		t.Fatalf("filler objects total %d, largest %d", total, largest)
 	}
 }

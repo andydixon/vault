@@ -93,9 +93,11 @@ decrypts it. That's the core loop. Put in, take out.
 
 The interesting part is what the folder looks like from the outside. Nothing.
 Well, not \emph{nothing}. A pile of randomly named files, all dated 1 January
-1970, in a handful of suspiciously round sizes. No names. No real sizes. No
-dates. No folders. Someone who steals the folder learns roughly how much stuff
-you have, and that's about it.
+1970, all in a handful of suspiciously round sizes, none bigger than 4\,MiB,
+scattered across folders named \file{00} to \file{ff}. No names. No real
+sizes. No dates. None of \emph{your} folders. Big files are cut into pieces
+that look like everything else. Someone who steals the folder learns roughly
+how much stuff you have, and that's about it.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -436,6 +438,12 @@ protect yet.
 
 \shot{init}{A fresh vault. Two sub-folders, a marker, and\ldots\ records already?!}
 
+Inside \file{records/} and \file{objects/} are 256 folders each, named
+\file{00} to \file{ff}. Every encrypted file lives in the one matching the
+first two characters of its name. That just keeps any one folder from
+getting huge, which some file systems and sync services dislike. All 256
+exist from the start, so the layout itself gives nothing away.
+
 \section{Wait, why is there already stuff in it?}
 
 Good catch. A brand new vault holds somewhere between 8 and 32 entries of
@@ -448,9 +456,32 @@ with your decoy passphrase sees unopenable entries, that's completely
 unremarkable. It's just filler. (Some of it might not be. They can't tell.)
 
 \begin{headsup}
-The filler takes a few tens of megabytes. That's the price of plausible
+By default the filler takes a few tens of megabytes. That's the price of plausible
 deniability, and it's paid once.
 \end{headsup}
+
+\section{More filler, for bigger secrets}
+
+A few tens of megabytes of filler can only cover for a few files. If you
+plan to hide more than that behind a decoy, ask for more when you create the
+vault:
+
+\begin{shell}
+$ vault init --filler 2G
+\end{shell}
+
+vault keeps writing filler until there's at least that much. Sizes take
+\cmd{K}, \cmd{M}, \cmd{G} or \cmd{T}. The filler entries are built exactly
+like real ones, from a mix of small and large random ``files'', so a big
+file of yours sits among big files of filler. It costs the disk space and a
+few seconds per gigabyte, once. It can only be chosen at \cmd{init}: added
+later, the filler would show up as a burst of new entries, which is exactly
+what it's meant to hide.
+
+\begin{quickwin}
+Rule of thumb: set \cmd{--filler} to at least as much as you ever expect to
+hide from the decoy passphrase. Without a decoy, you don't need it.
+\end{quickwin}
 
 \section{More than one vault}
 
@@ -473,6 +504,7 @@ type \cmd{--vault} again.
 \begin{pocketlist}
   \item \cmd{vault init} makes \file{\tld/.vault/store}. \cmd{--vault DIR} to put it elsewhere.
   \item Filler entries are normal. Nobody can open them. That's the point.
+  \item Hiding a lot behind a decoy? \cmd{vault init --filler 2G} (or however much you'll hide).
   \item One key, as many vaults as you like.
 \end{pocketlist}
 \end{pocket}
@@ -677,7 +709,8 @@ The decoy is chosen when the key is made, and only then:
 \begin{steps}
   \item Run \cmd{vault genkey}. Type your \emph{real} passphrase, twice.
   \item At \hl{Enter decoy passphrase (empty for none)}, type the decoy. Twice.
-  \item Run \cmd{vault init} as normal.
+  \item Run \cmd{vault init}, adding \cmd{--filler} with at least as much as
+        you plan to hide, say \cmd{--filler 5G}.
   \item Add some decoy files, typing the \emph{decoy} passphrase when asked.
   \item Add your real files, typing the \emph{real} passphrase.
 \end{steps}
@@ -704,8 +737,9 @@ there's nothing to safely ``upgrade''.
   \item \textbf{The vault can't tell.} Real and decoy entries are sealed to
         different keys, but they're the same size, the same shape, and all
         dated 1970. Nothing on disk says which key an entry belongs to.
-  \item \textbf{The filler covers for you.} Every vault starts with 8 to 32
-        entries nobody can open. So ``some entries I can't open'' is true of
+  \item \textbf{The filler covers for you.} Every vault starts with at
+        least 8 to 32 entries nobody can open, and as much more as you ask
+        for with \cmd{--filler}. So ``some entries I can't open'' is true of
         \emph{every} vault, decoy or not.
   \item \textbf{The errors are identical.} A real file asked for by name with
         the decoy passphrase gives exactly the same ``not in the vault'' as
@@ -734,10 +768,14 @@ one with two files called \file{test.txt}, is a neon sign.
 \section{The honest limits}
 
 \begin{headsup}
-\textbf{Numbers can give you away.} Every file is one entry (one file in
-\file{records/}), and filler adds at most 32. If the decoy shows 3 files but
-\file{records/} holds 400, the filler can't explain the difference. Keep the decoy collection
-large enough that the leftovers look like filler.
+\textbf{Numbers can give you away.} Someone holding the decoy passphrase
+can count the records and pieces they can't open. Without \cmd{--filler}
+there are only a few tens of megabytes of filler, so if \file{records/} holds
+400 entries, or \file{objects/} holds a 300\,MB video's 72 pieces, the
+filler can't explain the difference. They can't see \emph{what} the
+leftovers are, but they can see there's more than filler. Create the vault
+with \cmd{--filler} at least as large as what you'll hide, and keep the
+decoy collection believable next to it.
 \end{headsup}
 
 \begin{headsup}
@@ -950,8 +988,9 @@ point \cmd{--vault} at the backup copy and run \cmd{vault list} now and then.
 \begin{tldr}
 Each file gets its own random 256-bit key, wrapped with a hybrid of FrodoKEM
 and ML-KEM, and is encrypted in authenticated 64\,KiB chunks. Catalogue
-entries are padded to one fixed size, file contents to power-of-two buckets,
-and every timestamp on disk is set to 1970. An attacker learns roughly how
+entries are padded to one fixed size, file contents are cut into 4\,MiB
+pieces with the last padded to a power-of-two bucket, and every timestamp on
+disk is set to 1970. An attacker learns roughly how
 much you store. They can delete or roll back entries, but not read or forge them.
 \end{tldr}
 
@@ -983,25 +1022,59 @@ either one alone isn't enough.
   note/.style={font=\footnotesize\color{vslate},anchor=west},
   tree/.style={draw=vslate!45,line width=0.8pt}]
   \node[dir] (root) at (0,0) {\tld/.vault/store/};
-  \node[f] (m) at (0.6,-0.7) {.vault};      \node[note] at (4.2,-0.7) {marker: ``VAULT 1''};
+  \node[f] (m) at (0.6,-0.7) {.vault};      \node[note] at (4.2,-0.7) {marker: ``VAULT 2''};
   \node[f] (l) at (0.6,-1.3) {.lock};       \node[note] at (4.2,-1.3) {lock file, always empty};
-  \node[dir] (r) at (0.6,-1.9) {records/};  \node[note] at (4.2,-1.9) {one encrypted catalogue entry per file};
+  \node[dir] (r) at (0.6,-1.9) {records/0f/};  \node[note] at (4.2,-1.9) {one encrypted catalogue entry per file};
   \node[f] (r1) at (1.2,-2.5) {0f1170a6\ldots}; \node[note] at (4.2,-2.5) {every one exactly 18,704 bytes};
-  \node[dir] (o) at (0.6,-3.1) {objects/};  \node[note] at (4.2,-3.1) {one encrypted file body per file};
-  \node[f] (o1) at (1.2,-3.7) {3e78275e\ldots}; \node[note] at (4.2,-3.7) {64\,KiB, 128\,KiB, 256\,KiB\ldots\ never in between};
+  \node[dir] (o) at (0.6,-3.1) {objects/3e/};  \node[note] at (4.2,-3.1) {file contents, in 4\,MiB pieces};
+  \node[f] (o1) at (1.2,-3.7) {3e78275e\ldots}; \node[note] at (4.2,-3.7) {64\,KiB, 128\,KiB\ldots\ 4\,MiB, never in between};
   \draw[tree] (0.3,-0.25) |- (m.west); \draw[tree] (0.3,-0.7) |- (l.west); \draw[tree] (0.3,-1.3) |- (r.west);
   \draw[tree] (0.3,-1.9) |- (o.west);
   \draw[tree] (0.9,-2.15) |- (r1.west); \draw[tree] (0.9,-3.35) |- (o1.west);
 \end{tikzpicture}
 \end{center}
 
-A \hl{record} holds one file's name, size, permissions, dates and the ID of
-its object. It's padded to 4096 bytes before encryption, so every record is
-the same size whatever the name. An \hl{object} holds the file's contents,
-prefixed with its own ID and padded with random bytes up to the next power
-of two, at least 64\,KiB.
+A \hl{record} holds one file's name, size, permissions, dates and a secret
+random \hl{seed}. It's padded to 4096 bytes before encryption, so every
+record is the same size whatever the name. The file's contents are cut into
+\hl{objects} of just under 4\,MiB each. Every object starts with its own ID,
+the last one is padded with random bytes up to the next power of two (at
+least 64\,KiB), and each is encrypted separately. The objects' names are
+worked out from the seed, so only someone who can open the record can tell
+which objects belong together.
 
 \shot{on-disk}{Random names, identical sizes, and all ``modified'' at the dawn of Unix time}
+
+\section{Why big files are cut up}
+
+With one object per file, a 300\,MB video would sit in the folder as a
+single 512\,MiB blob. Everyone could see there's one large file, roughly how
+large, and, since filler is never that big, that it can't be filler. Cut
+into pieces, the same video is 72 objects of exactly the same size as the
+largest filler and as every other big file's pieces. Nothing on disk says
+which pieces belong together, or where one file ends and the next begins.
+
+It's not magic, and some padding and fluff is still doing the work:
+
+\begin{itemize}
+  \item \textbf{Small files are still bucketed.} A file under 4\,MiB is one
+        object padded to 64\,KiB, 128\,KiB, 256\,KiB and so on, exactly as
+        before. The last piece of a big file is padded the same way, so no
+        file wastes more than 4\,MiB, where a single padded blob could
+        waste nearly half its size.
+  \item \textbf{Filler is still the cover story.} The random entries
+        \cmd{init} writes are the reason ``objects I can't open'' is
+        unremarkable. By default there are only a few tens of megabytes of
+        them, enough to hide a few files, not gigabytes. \cmd{vault init
+        --filler SIZE} writes more, shaped like a real collection of
+        files, at the cost of that much disk.
+  \item \textbf{Totals still show.} The number of objects times 4\,MiB is
+        a fair estimate of how much you store.
+  \item \textbf{Timing still shows.} Someone who watches the folder change,
+        or reads a sync service's upload log, sees 72 objects appear together
+        and can guess they're one file. The pieces hide a file's size from a
+        snapshot, not from someone watching you add it.
+\end{itemize}
 
 \section{What an attacker learns}
 
@@ -1014,7 +1087,8 @@ Learn when a file was created or changed & \textcolor{vgreendeep}{\faIcon{times}
 Tell real entries from decoy or filler & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
 Alter a file without it being detected & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
 Swap one file's contents for another's & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
-Count entries, and see rough size buckets & \textcolor{vamberdeep}{\faIcon{check}\ yes} \\
+Tell which pieces make up one file, from a single copy & \textcolor{vgreendeep}{\faIcon{times}\ no} \\
+Count files, and see roughly how much you store & \textcolor{vamberdeep}{\faIcon{check}\ yes} \\
 See that the folder changed between two copies & \textcolor{vamberdeep}{\faIcon{check}\ yes} \\
 Delete entries & \textcolor{vcoraldeep}{\faIcon{check}\ yes} \\
 Put back an older copy of an entry (roll back) & \textcolor{vcoraldeep}{\faIcon{check}\ yes} \\
@@ -1029,15 +1103,17 @@ If the storage isn't under your control, keep an independent backup.
 \section{What happens during \texttt{add}}
 
 \begin{steps}
-  \item Read your file and encrypt its contents, plus random padding, to a
-        hidden temporary file in \file{objects/}.
-  \item Give it its random name. It's now safely stored, but nothing refers to it.
-  \item Encrypt a record pointing at it, the same way, into \file{records/}.
+  \item Pick a random seed. Read your file 4\,MiB at a time and encrypt each
+        piece, the last with random padding, to a hidden temporary file in
+        its \file{objects/} folder. Several pieces are written at once.
+  \item Give each piece the name the seed dictates. They're now safely
+        stored, but nothing refers to them.
+  \item Encrypt a record holding the seed, the same way, into \file{records/}.
   \item Only then, delete any older version of the same name.
 \end{steps}
 
-Interrupt it anywhere and the worst case is an orphaned encrypted object that
-nothing points to. You never end up with a record pointing at nothing, or
+Interrupt it anywhere and the worst case is some orphaned encrypted objects
+that nothing points to. You never end up with a record pointing at nothing, or
 without either version.
 
 \begin{squirrel}
@@ -1051,7 +1127,8 @@ is how bugs get in.
 \begin{pocket}
 \begin{pocketlist}
   \item Hybrid post-quantum key wrapping, per-file keys, authenticated streaming encryption.
-  \item Fixed-size records, power-of-two objects, 1970 timestamps: metadata stays private.
+  \item Fixed-size records, 4\,MiB pieces, power-of-two tails, 1970 timestamps: metadata stays private.
+  \item Pieces hide a file's size in any one copy of the folder, not from someone watching it change.
   \item Tampering is caught. Deletion and rollback are not, so keep backups.
 \end{pocketlist}
 \end{pocket}
@@ -1137,7 +1214,7 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \begin{tcbraster}[raster columns=2,raster equal height=rows,raster column skip=8pt,raster row skip=8pt,
   enhanced,colback=vmist,colframe=vline,boxrule=0.4pt,arc=4pt,left=9pt,right=9pt,top=7pt,bottom=7pt]
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault genkey}\\[2pt]\small Make a key. Asks for a passphrase and an optional decoy.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault init}\\[2pt]\small Make an empty vault, with filler.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault init}\\[2pt]\small Make an empty vault, with filler. \texttt{--filler 2G} for more.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault add FILE|DIR [FOLDER]}\\[2pt]\small Encrypt in, keeping the name. Replaces an existing name.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Size, modified time and name, sorted.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get NAME [-o OUT]}\\[2pt]\small Decrypt out. Never overwrites. Verifies first.\end{tcolorbox}
@@ -1154,6 +1231,7 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \textrm{(prompt)} & VAULT\_PASSPHRASE & asked on the terminal \\
 \textrm{(genkey prompt)} & VAULT\_DECOY\_PASSPHRASE & asked; empty means none \\
 -o OUT & \textrm{---} & the file's own name, here \\
+--filler SIZE & \textrm{---} & a few tens of MB, for \cmd{init} \\
 \end{vtable}
 
 \section*{Numbers worth knowing}
@@ -1162,7 +1240,9 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 Largest file & 1\,TiB \\
 Longest stored name & 1024 bytes \\
 Smallest object on disk & 64\,KiB \\
-Filler entries in a new vault & 8 to 32 \\
+Largest object on disk & 4\,MiB \\
+Folders under \file{records/} and \file{objects/} & 256 each \\
+Filler entries in a new vault & 8 to 32, or more with \cmd{--filler} \\
 Key file size & 319 bytes \\
 Exit codes & 0 ok, 1 error, 2 no command \\
 \end{vtable}
@@ -1177,13 +1257,13 @@ Exit codes & 0 ok, 1 error, 2 no command \\
   \item[Argon2id] A deliberately slow, memory-hard function that turns your passphrase into a key, making guessing expensive.
   \item[Catalogue] The encrypted list of what's in your vault, stored as one record per file.
   \item[Decoy passphrase] A second passphrase that opens a separate, harmless set of files.
-  \item[Entry] One record plus its object. Real, decoy and filler entries all look identical on disk.
+  \item[Entry] One record plus its objects. Real, decoy and filler entries all look identical on disk.
   \item[Filler] Entries sealed to a key that was immediately destroyed. Nobody can open them. They make the decoy plausible.
   \item[FrodoKEM, ML-KEM] Post-quantum key-encapsulation algorithms. vault uses both at once.
   \item[Key file] The small file holding your identity, encrypted under your passphrase (and decoy).
-  \item[Object] The encrypted contents of one file, padded to a power-of-two size.
+  \item[Object] One encrypted piece of a file, 4\,MiB, or padded to a smaller power of two if it's the last piece.
   \item[Post-quantum] Designed to stay secure against attackers with large quantum computers.
-  \item[Record] The encrypted catalogue entry for one file: its name, size, dates and object ID.
+  \item[Record] The encrypted catalogue entry for one file: its name, size, dates and the seed its objects' names come from.
   \item[Vault] The folder where your encrypted files live.
 \end{description}
 
