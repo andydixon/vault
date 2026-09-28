@@ -9,9 +9,12 @@ import (
 	"crypto/rand"
 	"io"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -293,5 +296,80 @@ func TestFiller(t *testing.T) {
 	}
 	if total < 24<<20 || largest > chunkSize+chunkSize/64 {
 		t.Fatalf("filler objects total %d, largest %d", total, largest)
+	}
+}
+
+// TestAddTree migrates "." holding the vault and key: structure is kept,
+// originals and emptied directories go, the vault and key are left alone.
+// A URL download is then added under a folder.
+func TestAddTree(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	os.MkdirAll(filepath.Join(dir, "a", "b"), 0o755)
+	os.WriteFile(filepath.Join(dir, "x"), []byte("x"), 0o600)
+	os.WriteFile(filepath.Join(dir, "a", "b", "y"), []byte("y"), 0o600)
+	t.Chdir(dir)
+
+	var skip []os.FileInfo
+	for _, p := range []string{"store", "key"} {
+		fi, _ := os.Stat(p)
+		skip = append(skip, fi)
+	}
+	cat, _ := s.catalogue()
+	if err := addPath(s, cat, "x", "d", false, skip, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Migrating over d/x must ask first, and a no must leave everything.
+	var asked []string
+	no := func(names []string) bool { asked = names; return false }
+	if err := addPath(s, cat, ".", "d", true, skip, no); err == nil || !slices.Equal(asked, []string{"d/x"}) {
+		t.Fatalf("migrate over d/x: err %v, asked %v", err, asked)
+	}
+	if _, err := os.Stat("x"); err != nil || len(cat) != 1 {
+		t.Fatalf("declined migrate changed things: %v, %d stored", err, len(cat))
+	}
+	if err := addPath(s, cat, ".", "d", true, skip, func([]string) bool { return true }); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for name := range cat {
+		got = append(got, name)
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"d/a/b/y", "d/x"}) {
+		t.Fatalf("stored %v", got)
+	}
+	var left []string
+	entries, _ := os.ReadDir(".")
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	if !slices.Equal(left, []string{"key", "store"}) {
+		t.Fatalf("left behind %v", left)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.UserAgent() != chromeUA {
+			http.Error(w, "bad agent", http.StatusForbidden)
+			return
+		}
+		io.WriteString(w, "body")
+	}))
+	defer srv.Close()
+	if err := addURL(s, cat, srv.URL+"/files/page.html", "web"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.get("web/page.html", "out"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile("out"); string(b) != "body" {
+		t.Fatalf("downloaded %q", b)
 	}
 }

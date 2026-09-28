@@ -1,9 +1,11 @@
 package term
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"golang.org/x/term"
 )
@@ -68,6 +70,23 @@ func ReadSecret(prompt string) (s []byte, err error) {
 		defer clearLine(out)
 		s, err = term.ReadPassword(int(in.Fd()))
 		return err
+	})
+	return
+}
+
+// Confirm asks a yes/no question on the terminal. Only "y" or "yes" is yes.
+func Confirm(prompt string) (yes bool, err error) {
+	err = WithTerminal(func(in, out *os.File) error {
+		fmt.Fprintf(out, "%s ", prompt)
+		line, err := bufio.NewReader(in).ReadString('\n')
+		if err != nil && line == "" {
+			return err
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes":
+			yes = true
+		}
+		return nil
 	})
 	return
 }

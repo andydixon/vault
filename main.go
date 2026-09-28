@@ -5,10 +5,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,8 +25,13 @@ const usage = `Usage:
     vault genkey                    create a new passphrase-protected key
     vault init [--filler SIZE]      create a new, empty vault, with at least
                                     SIZE of filler (e.g. 500M, 2G)
-    vault add FILE|DIR [FOLDER]     encrypt a file or directory into the vault,
+    vault add FILE|DIR|URL [FOLDER] encrypt a file, a directory (recursively)
+                                    or a downloaded URL into the vault,
                                     optionally under a folder inside the vault
+    vault migrate FILE|DIR [FOLDER] like add, then delete each original once
+    [--yes]                         it is stored; asks before overwriting
+                                    anything already in the vault, unless
+                                    --yes is given
     vault list [PREFIX]             list stored files
     vault get NAME [-o OUTPUT]      decrypt a stored file (default: its base name)
     vault mv OLD NEW                rename a stored file
@@ -65,6 +72,7 @@ func main() {
 	vaultDir := fset.String("vault", defaultPath("VAULT_DIR", "store"), "")
 	output := fset.String("o", "", "")
 	filler := fset.String("filler", "0", "")
+	yes := fset.Bool("yes", false, "")
 	pos, err := parseInterleaved(fset, args)
 	if err != nil {
 		fail("%v\n\n%s", err, usage)
@@ -94,7 +102,7 @@ func main() {
 		check(err)
 		check(initStore(*vaultDir, size))
 		fmt.Fprintf(os.Stderr, "vault created at %s\n", *vaultDir)
-	case "add":
+	case "add", "migrate":
 		want(1, 2)
 		dest := ""
 		if len(pos) == 2 {
@@ -103,7 +111,25 @@ func main() {
 		s := open(*keyPath, *vaultDir, true)
 		cat, err := s.catalogue()
 		check(err)
-		check(addPath(s, cat, pos[0], dest))
+		if isURL(pos[0]) {
+			if cmd == "migrate" {
+				fail("cannot migrate a URL; use add")
+			}
+			check(addURL(s, cat, pos[0], dest))
+			break
+		}
+		// Never ingest, or delete, the vault or its key.
+		var skip []os.FileInfo
+		for _, p := range []string{*vaultDir, *keyPath} {
+			if fi, err := os.Stat(p); err == nil {
+				skip = append(skip, fi)
+			}
+		}
+		overwrite := confirmOverwrite
+		if *yes {
+			overwrite = func([]string) bool { return true }
+		}
+		check(addPath(s, cat, pos[0], dest, cmd == "migrate", skip, overwrite))
 	case "list", "ls":
 		want(0, 1)
 		prefix := ""
@@ -228,33 +254,149 @@ func decoyPassphrase() string {
 	return string(p)
 }
 
-// addPath adds a file, or every regular file under a directory, beneath dest.
-func addPath(s *store, cat map[string][]*record, src, dest string) error {
+// addPath adds a file, or every regular file under a directory, beneath dest,
+// keeping the directory structure. A directory named "." or ".." adds its
+// contents directly beneath dest. With migrate, each original is deleted
+// once stored, then any directories left empty, and nothing is stored
+// unless overwrite approves the vault names it would replace, if any.
+func addPath(s *store, cat map[string][]*record, src, dest string, migrate bool, skip []os.FileInfo, overwrite func([]string) bool) error {
 	info, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
 	base := filepath.Base(filepath.Clean(src))
-	if !info.IsDir() {
-		return addOne(s, cat, src, path.Join(dest, base))
+	if base == "." || base == ".." || base == string(filepath.Separator) {
+		base = ""
 	}
-	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+	skipped := func(fi os.FileInfo) bool {
+		for _, s := range skip {
+			if os.SameFile(fi, s) {
+				return true
+			}
 		}
-		if !d.Type().IsRegular() {
-			fmt.Fprintf(os.Stderr, "skipping %s: not a regular file\n", p)
+		return false
+	}
+	if skipped(info) {
+		return fmt.Errorf("%s is the vault or its key", src)
+	}
+	type item struct{ src, name string }
+	var items []item
+	var dirs []string
+	if !info.IsDir() {
+		items = append(items, item{src, path.Join(dest, filepath.Base(src))})
+	} else {
+		err = filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if fi, err := d.Info(); err == nil && skipped(fi) {
+				fmt.Fprintf(os.Stderr, "skipping %s: the vault or its key\n", p)
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				dirs = append(dirs, p)
+				return nil
+			}
+			if !d.Type().IsRegular() {
+				fmt.Fprintf(os.Stderr, "skipping %s: not a regular file\n", p)
+				return nil
+			}
+			rel, err := filepath.Rel(src, p)
+			if err != nil {
+				return err
+			}
+			items = append(items, item{p, path.Join(dest, base, filepath.ToSlash(rel))})
 			return nil
-		}
-		rel, err := filepath.Rel(src, p)
+		})
 		if err != nil {
 			return err
 		}
-		return addOne(s, cat, p, path.Join(dest, base, filepath.ToSlash(rel)))
-	})
+	}
+	if migrate {
+		var existing []string
+		for _, it := range items {
+			if len(cat[it.name]) > 0 {
+				existing = append(existing, it.name)
+			}
+		}
+		if len(existing) > 0 && !overwrite(existing) {
+			return errors.New("migrate cancelled; nothing changed")
+		}
+	}
+	for _, it := range items {
+		if err := addOne(s, cat, it.src, it.name, migrate); err != nil {
+			return err
+		}
+	}
+	if migrate {
+		// Children come after their parents in walk order, so go backwards.
+		// Directories still holding skipped files stay.
+		for i := len(dirs) - 1; i >= 0; i-- {
+			os.Remove(dirs[i])
+		}
+	}
+	return nil
 }
 
-func addOne(s *store, cat map[string][]*record, src, name string) error {
+// confirmOverwrite lists the vault names a migrate would replace and asks
+// on the terminal whether to go ahead. No terminal means no.
+func confirmOverwrite(names []string) bool {
+	fmt.Fprintln(os.Stderr, "these files are already in the vault and would be overwritten:")
+	for _, name := range names {
+		fmt.Fprintf(os.Stderr, "    %s\n", name)
+	}
+	ok, err := term.Confirm(fmt.Sprintf("overwrite %d file(s)? [y/N]", len(names)))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot ask for confirmation: %v\n", err)
+	}
+	return ok
+}
+
+func isURL(s string) bool {
+	return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")
+}
+
+const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+
+// addURL downloads rawURL to a private temporary file and adds it beneath
+// dest, named after the last element of the final (post-redirect) URL path.
+func addURL(s *store, cat map[string][]*record, rawURL, dest string) error {
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", chromeUA)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: %s", rawURL, resp.Status)
+	}
+	name := path.Base(resp.Request.URL.Path)
+	if name == "/" || name == "." {
+		name = resp.Request.URL.Hostname()
+	}
+	tmp, err := os.CreateTemp("", "vault-download-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		return fmt.Errorf("%s: %w", rawURL, err)
+	}
+	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
+		os.Chtimes(tmp.Name(), t, t)
+	}
+	return addOne(s, cat, tmp.Name(), path.Join(dest, name), false)
+}
+
+func addOne(s *store, cat map[string][]*record, src, name string, migrate bool) error {
 	replaced, err := s.add(cat, src, name)
 	if err != nil {
 		return err
@@ -262,6 +404,12 @@ func addOne(s *store, cat map[string][]*record, src, name string) error {
 	verb := "added"
 	if replaced {
 		verb = "replaced"
+	}
+	if migrate {
+		if err := os.Remove(src); err != nil {
+			return err
+		}
+		verb = "migrated"
 	}
 	fmt.Fprintf(os.Stderr, "%s %s\n", verb, name)
 	return nil

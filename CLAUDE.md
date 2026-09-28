@@ -7,7 +7,8 @@ This file provides guidance to Claude Code when working with this repository.
 vault is a post-quantum encrypted file vault: one `package main` at the repo
 root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 
-- `main.go` - CLI: `genkey`, `init`, `add`, `list`, `get`, `mv`, `rm`.
+- `main.go` - CLI: `genkey`, `init`, `add` (file, directory
+  or URL), `migrate` (add, then delete originals), `list`, `get`, `mv`, `rm`.
 - `keyfile.go` - key file with two passphrase slots (Argon2id +
   XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
   slot is either a decoy identity or random bytes; slot order is random.

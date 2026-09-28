@@ -522,7 +522,7 @@ for your passphrase. That's the whole daily workflow.
 \section{Putting things in: \texttt{add}}
 
 \begin{shell}
-$ vault add FILE-OR-FOLDER [FOLDER-IN-VAULT]
+$ vault add FILE-OR-FOLDER-OR-URL [FOLDER-IN-VAULT]
 \end{shell}
 
 Give it a file, and it goes in under its own name. Give it a second argument,
@@ -540,6 +540,8 @@ Notice what happened there:
         \file{id/passport-scan.jpg}.
   \item Adding the folder \file{Documents/letters} kept its own name and
         structure: \file{letters/bank.txt}, \file{letters/landlord.txt}.
+  \item Adding \file{.} (or \file{..}) brings in that folder's
+        \emph{contents}, subfolders and all, without a folder name of its own.
 \end{itemize}
 
 \begin{headsup}
@@ -553,9 +555,28 @@ Adding a name that already exists \hl{replaces} it, and vault tells you so.
 The old version is deleted \emph{after} the new one is safely stored, so a
 crash halfway through never leaves you with neither.
 
+\subsection{Straight from the web}
+Give \cmd{add} an \file{http://} or \file{https://} address and vault
+downloads it (as Chrome, so fussy sites play along) and stores it under the
+last part of the address, such as \file{report.pdf}. The download sits in a
+private temporary file only until it's encrypted.
+
+\subsection{Moving in: \texttt{migrate}}
+\cmd{migrate} works exactly like \cmd{add}, but deletes each original once
+it's safely stored, then tidies away any folders left empty. It won't take a
+URL; there's no original to delete.
+
+Because the originals go, \cmd{migrate} checks first: if anything would
+\hl{replace} a file already in the vault, it lists those names and asks
+before touching anything. Answer anything but \texttt{y} and nothing changes.
+With no terminal to ask on, the answer is no. For scripts, \texttt{--yes}
+answers yes up front.
+
 \subsection{What gets skipped}
 When adding a folder, anything that isn't a plain file, such as symbolic
-links, sockets or devices, is skipped with a note. Files larger than 1\,TiB are
+links, sockets or devices, is skipped with a note. So are the vault and key
+themselves, should they live inside the folder, so \cmd{migrate} can never
+eat them. Files larger than 1\,TiB are
 refused. (If you have a single 1\,TiB file, we have questions.)
 
 \section{Seeing what's inside: \texttt{list}}
