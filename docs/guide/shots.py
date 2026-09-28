@@ -16,6 +16,7 @@ import glob
 import grp
 import html
 import os
+import pty
 import shutil
 import subprocess
 import sys
@@ -93,6 +94,28 @@ class Sandbox:
         p = subprocess.run(["bash", "-c", command], cwd=self.home, env=env,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         return self.tidy(p.stdout)
+
+    def run_tty(self, command, passphrase, answer):
+        """Run on a pseudo-terminal, typing answer at vault's [y/N] question."""
+        env = self.env({"VAULT_PASSPHRASE": passphrase})
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.chdir(self.home)
+            os.execve("/bin/bash", ["bash", "-c", command], env)
+        out = b""
+        while b"[y/N]" not in out:
+            out += os.read(fd, 1024)
+        os.write(fd, answer.encode() + b"\n")
+        try:
+            while True:
+                chunk = os.read(fd, 1024)
+                if not chunk:
+                    break
+                out += chunk
+        except OSError:
+            pass
+        os.waitpid(pid, 0)
+        return self.tidy(out.decode().replace("\r\n", "\n"))
 
     def tidy(self, text):
         owner = " %s %s " % (getpass.getuser(), grp.getgrgid(os.getgid()).gr_name)
@@ -277,6 +300,20 @@ def main():
     t.cmd("vault get ideas/notes.md -o /tmp/x.md", D, highlight=("not in the vault",))
     t.cmd("find ~/.vault/store/records -type f | wc -l")
     shoot("decoy-hidden", t)
+
+    # migrate: one file is already in the vault, so it asks first
+    box.write("Scans/receipts/march.pdf", os.urandom(48_113))
+    box.write("Scans/receipts/april.pdf", os.urandom(51_870))
+    box.run("vault add Scans/receipts/march.pdf receipts", P)
+    t = Term(box)
+    t.lines.append(prompt() + '<span class="c">vault migrate Scans/receipts</span>')
+    for line in box.run_tty("vault migrate Scans/receipts", P, "y").split("\n"):
+        esc = html.escape(line)
+        if "[y/N]" in line:
+            esc = '<span class="hl">%s</span>' % esc
+        t.lines.append(esc)
+    t.cmd("ls Scans")
+    shoot("migrate", t)
 
     # errors
     t = Term(box)
