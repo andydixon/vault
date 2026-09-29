@@ -1,0 +1,34 @@
+.TH VAULT-LIST 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-list \- list files in the vault
+.SH SYNOPSIS
+.B vault list
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.RI [ PREFIX ]
+.br
+.B vault ls
+\&...
+.SH DESCRIPTION
+Prints one line per stored file, sorted by name: human-readable size,
+modification time (local, minute resolution) and name. With \fIPREFIX\fR only
+that file, or files under that folder, are shown. Records the passphrase
+cannot open are skipped silently. Takes a shared lock.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-get (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

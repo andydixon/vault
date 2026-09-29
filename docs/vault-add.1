@@ -1,0 +1,46 @@
+.TH VAULT-ADD 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-add \- encrypt files, directories or URLs into the vault
+.SH SYNOPSIS
+.B vault add
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.IR FILE | DIR | URL
+.RI [ FOLDER ]
+.SH DESCRIPTION
+Encrypts a file into the vault, named after its base name. A directory is
+added recursively, keeping its structure beneath its own name; a directory
+named "." or ".." adds its contents directly. Non-regular files, the vault
+and the key are skipped. A stored name that already exists is replaced.
+.PP
+An \fBhttp://\fR or \fBhttps://\fR \fIURL\fR is downloaded with a Chrome user
+agent and stored under the last element of its final (post-redirect) path, or
+the host name if there is none. Only a 200 response is accepted.
+.PP
+\fIFOLDER\fR places the result inside a folder in the vault. File contents
+are cut into 4 MiB chunks, the last bucket-padded.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH EXAMPLES
+.nf
+vault add report.pdf work/2026
+vault add ./photos
+vault add https://example.com/paper.pdf papers
+.fi
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-migrate (1),
+.BR vault\-mirror (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

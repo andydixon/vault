@@ -1,0 +1,27 @@
+.TH VAULT-INIT 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-init \- create an empty vault
+.SH SYNOPSIS
+.B vault init
+.RB [ \-\-vault
+.IR DIR ]
+.RB [ \-\-filler
+.IR SIZE ]
+.SH DESCRIPTION
+Creates the vault directory, with \fBrecords/\fR and \fBobjects/\fR each
+sharded into 256 subdirectories. It writes at least \fISIZE\fR bytes of
+unreadable filler so that real files cannot be told apart from it by anyone
+lacking the right passphrase. Filler is always written, even when \fISIZE\fR is 0.
+.SH OPTIONS
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.TP
+.BI \-\-filler " SIZE"
+Minimum filler, in bytes, with an optional K, M, G or T suffix (powers of
+1024), e.g. 500M or 2G. Default: 0.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-genkey (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

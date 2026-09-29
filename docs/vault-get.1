@@ -1,0 +1,32 @@
+.TH VAULT-GET 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-get \- decrypt a stored file
+.SH SYNOPSIS
+.B vault get
+.RB [ \-o
+.IR OUTPUT ]
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.I NAME
+.SH DESCRIPTION
+Decrypts \fINAME\fR. Nothing appears at the output path until every object has
+authenticated. The stored mode and modification time are restored. It refuses
+to overwrite an existing file. Takes a shared lock.
+.SH OPTIONS
+.TP
+.BI \-o " OUTPUT"
+Output path. Default: the base name of \fINAME\fR in the current directory.
+.PP
+See also \fB\-\-key\fR and \fB\-\-vault\fR in
+.BR vault (1).
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-list (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

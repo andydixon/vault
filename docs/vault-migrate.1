@@ -1,0 +1,41 @@
+.TH VAULT-MIGRATE 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-migrate \- move files into the vault, deleting the originals
+.SH SYNOPSIS
+.B vault migrate
+.RB [ \-\-yes ]
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.IR FILE | DIR
+.RI [ FOLDER ]
+.SH DESCRIPTION
+Works like
+.BR vault\-add (1)
+but deletes each original once it is stored, then any directories left empty.
+Directories still holding skipped files stay. A URL cannot be migrated.
+.PP
+Before storing anything it lists the vault names that would be overwritten and
+asks for confirmation on the terminal. With no terminal the answer is no, and
+nothing changes.
+.SH OPTIONS
+.TP
+.B \-\-yes
+Overwrite without asking.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-add (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

@@ -1,0 +1,106 @@
+.TH VAULT 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault \- post-quantum encrypted file vault
+.SH SYNOPSIS
+.B vault
+.I command
+.RI [ options ]
+.RI [ arguments ]
+.SH DESCRIPTION
+.B vault
+stores files in a directory of encrypted, fixed-size records and chunks.
+Encryption is a hybrid of FrodoKEM-640 and ML-KEM-768 with ChaCha20-Poly1305.
+The key file is protected by an Argon2id-derived passphrase key.
+File names, sizes and contents are only visible to a holder of the key and
+passphrase. Ciphertext sizes and timestamps are normalised to hide
+metadata from the storage host.
+.PP
+Options may appear before, between or after the arguments.
+.SH COMMANDS
+.TP
+.BR vault\-genkey (1)
+Create a new passphrase-protected key file.
+.TP
+.BR vault\-init (1)
+Create a new, empty vault.
+.TP
+.BR vault\-add (1)
+Encrypt a file, directory or downloaded URL into the vault.
+.TP
+.BR vault\-migrate (1)
+Like add, then delete each original.
+.TP
+.BR vault\-mirror (1)
+Crawl a website into the vault.
+.TP
+.BR vault\-list (1)
+List stored files (alias:
+.BR ls ).
+.TP
+.BR vault\-get (1)
+Decrypt a stored file.
+.TP
+.BR vault\-mv (1)
+Rename a stored file (alias:
+.BR rename ).
+.TP
+.BR vault\-rm (1)
+Delete a stored file (alias:
+.BR delete ).
+.TP
+.B help
+Print usage.
+.SH OPTIONS
+These apply to every command.
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_KEY
+Default key file.
+.TP
+.B VAULT_DIR
+Default vault directory.
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.TP
+.B VAULT_DECOY_PASSPHRASE
+Decoy passphrase used by
+.BR "vault genkey" .
+.SH LOCKING
+Commands that change the vault hold an exclusive lock on
+.IR DIR/.lock ;
+readers hold a shared lock. The lock is taken after the passphrase prompt.
+.SH DECOY PASSPHRASE
+.B genkey
+can add a second passphrase. It unlocks a separate identity, so every
+command run with it sees and changes only the decoy files, and the real
+files stay invisible. The key file does not reveal whether a decoy exists,
+and
+.B init
+fills each vault with unreadable filler, so hidden files look like filler to
+anyone holding only the decoy passphrase.
+.SH EXIT STATUS
+0 on success; 1 on error (diagnostics on standard error); 2 when run with no command.
+.SH EXAMPLES
+.nf
+vault genkey
+vault init \-\-filler 500M
+vault add report.pdf work/2026
+vault list work
+vault get work/2026/report.pdf \-o /tmp/report.pdf
+.fi
+.SH FILES
+.TP
+.I ~/.vault/key
+Default key file.
+.TP
+.I ~/.vault/store
+Default vault directory.
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

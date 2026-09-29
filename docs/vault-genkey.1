@@ -1,0 +1,32 @@
+.TH VAULT-GENKEY 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-genkey \- create a new vault key
+.SH SYNOPSIS
+.B vault genkey
+.RB [ \-\-key
+.IR PATH ]
+.SH DESCRIPTION
+Creates the key file, prompting twice for a passphrase, then for an optional
+decoy passphrase (empty for none). Both passphrase slots are sealed with
+Argon2id and XChaCha20-Poly1305, are the same size, and are stored in random
+order; the second holds either a decoy identity or random bytes. It refuses to
+overwrite an existing file. No seed or private key is ever written unencrypted.
+.PP
+When \fBVAULT_PASSPHRASE\fR is set, no prompts are made and the decoy comes
+from \fBVAULT_DECOY_PASSPHRASE\fR, or is omitted.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Where to write the key. Default: $VAULT_KEY, else ~/.vault/key.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.TP
+.B VAULT_DECOY_PASSPHRASE
+Decoy passphrase; must differ from the passphrase.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-init (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx
