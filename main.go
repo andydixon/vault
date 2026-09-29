@@ -32,6 +32,9 @@ const usage = `Usage:
     [--yes]                         it is stored; asks before overwriting
                                     anything already in the vault, unless
                                     --yes is given
+    vault mirror URL [FOLDER]       crawl a website (same host only, one request
+                                    at a time) into FOLDER/HOST, rewriting its
+                                    links to relative paths
     vault list [PREFIX]             list stored files
     vault get NAME [-o OUTPUT]      decrypt a stored file (default: its base name)
     vault mv OLD NEW                rename a stored file
@@ -130,6 +133,19 @@ func main() {
 			overwrite = func([]string) bool { return true }
 		}
 		check(addPath(s, cat, pos[0], dest, cmd == "migrate", skip, overwrite))
+	case "mirror":
+		want(1, 2)
+		if !isURL(pos[0]) {
+			fail("mirror needs an http:// or https:// URL")
+		}
+		dest := ""
+		if len(pos) == 2 {
+			dest = strings.Trim(pos[1], "/")
+		}
+		s := open(*keyPath, *vaultDir, true)
+		cat, err := s.catalogue()
+		check(err)
+		check(mirror(s, cat, pos[0], dest))
 	case "list", "ls":
 		want(0, 1)
 		prefix := ""

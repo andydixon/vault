@@ -373,3 +373,60 @@ func TestAddTree(t *testing.T) {
 		t.Fatalf("downloaded %q", b)
 	}
 }
+
+// TestMirror crawls a two-page site: links in HTML and CSS become relative,
+// off-host links stay, and everything is stored under host/.
+func TestMirror(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.UserAgent() != chromeUA {
+			http.Error(w, "bad agent", http.StatusForbidden)
+			return
+		}
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html")
+			io.WriteString(w, `<a href="`+srv.URL+`/sub/p.html#x">p</a> <a href="https://elsewhere.example/">e</a> <link href='/s.css'>`)
+		case "/sub/p.html":
+			w.Header().Set("Content-Type", "text/html")
+			io.WriteString(w, `<a href="/">home</a> <img src="../img/a.png">`)
+		case "/s.css":
+			w.Header().Set("Content-Type", "text/css")
+			io.WriteString(w, `body{background:url(/img/a.png)}`)
+		case "/img/a.png":
+			io.WriteString(w, "png")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	cat, _ := s.catalogue()
+	if err := mirror(s, cat, srv.URL, "m"); err != nil {
+		t.Fatal(err)
+	}
+	host := srv.Listener.Addr().String()
+	for name, want := range map[string]string{
+		"m/" + host + "/index.html": `<a href="sub/p.html#x">p</a> <a href="https://elsewhere.example/">e</a> <link href='s.css'>`,
+		"m/" + host + "/sub/p.html": `<a href="../index.html">home</a> <img src="../img/a.png">`,
+		"m/" + host + "/s.css":      `body{background:url(img/a.png)}`,
+		"m/" + host + "/img/a.png":  "png",
+	} {
+		out := filepath.Join(dir, "out")
+		if err := s.get(name, out); err != nil {
+			t.Fatal(name, err)
+		}
+		if b, _ := os.ReadFile(out); string(b) != want {
+			t.Errorf("%s = %q, want %q", name, b, want)
+		}
+		os.Remove(out)
+	}
+}

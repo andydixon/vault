@@ -561,6 +561,12 @@ downloads it (as Chrome, so fussy sites play along) and stores it under the
 last part of the address, such as \file{report.pdf}. The download sits in a
 private temporary file only until it's encrypted.
 
+\subsection{Copying a website: \texttt{mirror}}
+\cmd{mirror} takes an \file{http://} or \file{https://} address and copies
+the whole site, one request at a time, into a folder named after its host.
+Links inside pages and stylesheets are rewritten to relative paths, so the
+copy still browses once you get it out. Only the same host is followed.
+
 \subsection{Moving in: \texttt{migrate}}
 \cmd{migrate} works exactly like \cmd{add}, but deletes each original once
 it's safely stored, then tidies away any folders left empty. It won't take a

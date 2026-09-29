@@ -1,0 +1,86 @@
+.TH VAULT-MIRROR 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-mirror \- mirror a website into an encrypted vault
+.SH SYNOPSIS
+.B vault mirror
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.I URL
+.RI [ FOLDER ]
+.SH DESCRIPTION
+.B vault mirror
+crawls the website at
+.I URL
+and stores every page and asset it finds in the vault, beneath
+.IR FOLDER / HOST
+(or just
+.I HOST
+if no folder is given).
+.PP
+The crawl is single threaded: one request at a time, in breadth-first order.
+It follows only links on the same host as
+.IR URL ,
+and requests are sent with a Chrome user agent string.
+.PP
+Links in HTML
+.RB ( href ,
+.BR src ,
+.BR action
+and
+.B poster
+attributes) and in CSS
+.RB ( url(...) )
+that point into the mirror are rewritten to relative paths, so the copy
+browses correctly once fetched out of the vault. Links to other hosts, and
+fragments, are left as they were.
+.PP
+Pages are named after their URL path. A path that is empty or ends in
+.B /
+becomes
+.BR index.html ;
+a query string is appended as
+.BI _ query
+(URL-escaped). Anything already stored under the same name is replaced.
+.PP
+A page that fails to download, or answers with anything but
+.BR "200 OK" ,
+is reported on standard error and skipped; the crawl carries on.
+The vault is locked exclusively for the whole run.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH EXAMPLES
+Mirror a site into the vault under
+.BR example.com/ :
+.PP
+.RS
+vault mirror https://example.com/
+.RE
+.PP
+Mirror it under a folder, then fetch the front page:
+.PP
+.RS
+vault mirror https://example.com/ archive/2026
+.br
+vault get archive/2026/example.com/index.html
+.RE
+.SH LIMITATIONS
+Links are found by pattern matching, not by parsing HTML: URLs assembled by
+scripts, and
+.B srcset
+lists, are neither followed nor rewritten. There is no depth limit, rate
+limit or robots.txt handling; only mirror sites you may copy.
+.SH SEE ALSO
+.BR vault (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx
