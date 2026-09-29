@@ -30,6 +30,12 @@ A full illustrated guide lives in `docs/guide`. Build the PDF with
 `docs/guide/build-pdf.sh`, which fetches Tectonic if it isn't installed.
 `docs/guide/shots.py` regenerates its screenshots from the real binary.
 
+## Man pages
+
+`docs/*.1` holds `vault(1)` and one page per command (`vault-add(1)`,
+`vault-mirror(1)` and so on). Install them with
+`cp docs/*.1 ~/.local/share/man/man1/`.
+
 ## Use
 
 ```sh
@@ -39,6 +45,9 @@ vault init --filler 2G           # the same, with at least 2 GiB of filler
 vault add report.pdf             # stored as report.pdf
 vault add report.pdf work/2026   # stored as work/2026/report.pdf
 vault add ./photos               # every regular file under photos/
+vault add https://example.com/a.pdf   # download and store a URL
+vault migrate ./photos           # like add, then delete the originals
+vault mirror https://example.com/     # crawl a site into example.com/, links rewritten
 vault list                       # everything
 vault list work                  # everything under work/
 vault get work/2026/report.pdf   # writes ./report.pdf
