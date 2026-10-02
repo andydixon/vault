@@ -567,6 +567,22 @@ the whole site, one request at a time, into a folder named after its host.
 Links inside pages and stylesheets are rewritten to relative paths, so the
 copy still browses once you get it out. Only the same host is followed.
 
+\subsection{From a tar archive: \texttt{absorb}}
+\cmd{absorb} reads a tar archive, gzipped or not, from standard input and
+stores every plain file in it, optionally under a folder:
+
+\begin{verbatim}
+tar -cz photos | vault absorb backup
+ssh server 'tar -c /etc' | vault absorb server1
+vault absorb old < archive.tar.gz
+\end{verbatim}
+
+Each file is encrypted straight from the stream, so nothing is unpacked to
+disk first. Directories need no entry of their own; links, devices and any
+name that tries to climb out with \file{..} are skipped with a note. If the
+archive stops halfway through a file, that file isn't stored and vault
+stops; everything before it is already safely in.
+
 \subsection{Moving in: \texttt{migrate}}
 \cmd{migrate} works exactly like \cmd{add}, but deletes each original once
 it's safely stored, then tidies away any folders left empty. It won't take a

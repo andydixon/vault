@@ -48,6 +48,7 @@ vault add ./photos               # every regular file under photos/
 vault add https://example.com/a.pdf   # download and store a URL
 vault migrate ./photos           # like add, then delete the originals
 vault mirror https://example.com/     # crawl a site into example.com/, links rewritten
+tar -cz photos | vault absorb backup  # every file in a tar (or .tar.gz) under backup/
 vault list                       # everything
 vault list work                  # everything under work/
 vault get work/2026/report.pdf   # writes ./report.pdf

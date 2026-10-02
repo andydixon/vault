@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	mrand "math/rand/v2"
 	"os"
@@ -382,30 +383,43 @@ func (s *store) add(cat map[string][]*record, src, name string) (bool, error) {
 	if !info.Mode().IsRegular() || info.Size() > fileLimit {
 		return false, fmt.Errorf("%s: not a regular file of at most 1 TiB", src)
 	}
+	replaced, err := s.addReader(cat, f, info.Size(), info.Mode().Perm(), info.ModTime(), name)
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
+		err = fmt.Errorf("%s changed while being added", src)
+	}
+	return replaced, err
+}
+
+// addReader stores size bytes from r as name, like add. Reading fewer than
+// size bytes stores nothing and fails with io.ErrUnexpectedEOF or io.EOF.
+func (s *store) addReader(cat map[string][]*record, r io.Reader, size int64, mode fs.FileMode, mtime time.Time, name string) (bool, error) {
+	if !validName(name) {
+		return false, fmt.Errorf("invalid vault path %q", name)
+	}
+	if size < 0 || size > fileLimit {
+		return false, fmt.Errorf("%s: larger than 1 TiB", name)
+	}
 	seed, err := randomHex(objectSeedSize)
 	if err != nil {
 		return false, err
 	}
-	if err := s.writeObjects(f, seed, info.Size()); err != nil {
-		s.dropObjects(seed, info.Size())
-		if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
-			err = fmt.Errorf("%s changed while being added", src)
-		}
+	if err := s.writeObjects(r, seed, size); err != nil {
+		s.dropObjects(seed, size)
 		return false, err
 	}
-	r := &record{
-		Name: name, Seed: seed, Size: info.Size(), Mode: uint32(info.Mode().Perm()),
-		Modified: info.ModTime().UTC(), Added: time.Now().UTC(),
+	rec := &record{
+		Name: name, Seed: seed, Size: size, Mode: uint32(mode.Perm()),
+		Modified: mtime.UTC(), Added: time.Now().UTC(),
 	}
-	if err := s.writeRecord(r); err != nil {
-		s.dropObjects(seed, info.Size())
+	if err := s.writeRecord(rec); err != nil {
+		s.dropObjects(seed, size)
 		return false, err
 	}
 	replaced := len(cat[name]) > 0
 	if err := s.remove(cat, name, true); err != nil {
 		return replaced, err
 	}
-	cat[name] = []*record{r}
+	cat[name] = []*record{rec}
 	return replaced, nil
 }
 

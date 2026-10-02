@@ -315,6 +315,35 @@ def main():
     t.cmd("ls Scans")
     shoot("migrate", t)
 
+    # absorb: a tar archive piped in, here pulled from a gzipped tarball
+    box.write("Projects/website/index.html", "<h1>hello</h1>\n")
+    box.write("Projects/website/css/site.css", "body{}\n")
+    box.write("Projects/website/img/logo.png", os.urandom(24_311))
+    t = Term(box)
+    t.cmd("tar -czf website.tar.gz -C Projects website")
+    t.cmd("vault absorb backups < website.tar.gz", P)
+    t.cmd("tar -c recipes | vault absorb old", P)
+    t.cmd("vault list backups", P)
+    shoot("absorb", t)
+
+    # mirror: a tiny local site, served on localhost
+    site = os.path.join(box.root, "site")
+    for rel, body in {"index.html": '<a href="/about.html">About</a> <link href="/style.css">',
+                      "about.html": '<a href="/">Home</a> <img src="/img/me.png">',
+                      "style.css": "body{background:url(/img/bg.png)}",
+                      "img/me.png": "png", "img/bg.png": "png"}.items():
+        os.makedirs(os.path.dirname(os.path.join(site, rel)), exist_ok=True)
+        with open(os.path.join(site, rel), "w") as f:
+            f.write(body)
+    srv = subprocess.Popen([sys.executable, "-m", "http.server", "8000", "--bind", "127.0.0.1"],
+                           cwd=site, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1)
+    t = Term(box)
+    t.cmd("vault mirror http://localhost:8000/ sites", P)
+    t.cmd("vault get sites/localhost:8000/about.html && cat about.html", P)
+    shoot("mirror", t)
+    srv.terminate()
+
     # errors
     t = Term(box)
     t.cmd("vault list", "hunter2", highlight=("incorrect",))

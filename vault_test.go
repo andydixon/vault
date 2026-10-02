@@ -4,8 +4,10 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"io"
 	"io/fs"
@@ -428,5 +430,52 @@ func TestMirror(t *testing.T) {
 			t.Errorf("%s = %q, want %q", name, b, want)
 		}
 		os.Remove(out)
+	}
+}
+
+func TestAbsorb(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+	mtime := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	for _, h := range []*tar.Header{
+		{Name: "./d/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "./d/a.txt", Size: 5, Mode: 0o600, ModTime: mtime},
+		{Name: "../escape", Size: 5, Mode: 0o600},
+		{Name: "./d/link", Typeflag: tar.TypeSymlink, Linkname: "a.txt"},
+	} {
+		tw.WriteHeader(h)
+		if h.Size > 0 {
+			io.WriteString(tw, "hello")
+		}
+	}
+	tw.Close()
+	zw.Close()
+
+	cat, _ := s.catalogue()
+	if err := absorb(s, cat, &buf, "in"); err != nil {
+		t.Fatal(err)
+	}
+	if len(cat) != 1 || len(cat["in/d/a.txt"]) != 1 {
+		t.Fatalf("catalogue = %v, want only in/d/a.txt", cat)
+	}
+	if r := cat["in/d/a.txt"][0]; !r.Modified.Equal(mtime) || r.Mode != 0o600 {
+		t.Errorf("record = %v, %o", r.Modified, r.Mode)
+	}
+	out := filepath.Join(dir, "out")
+	if err := s.get("in/d/a.txt", out); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(out); string(b) != "hello" {
+		t.Errorf("got %q", b)
 	}
 }

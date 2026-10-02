@@ -1,0 +1,73 @@
+.TH VAULT-ABSORB 1 "October 2026" "vault" "User Commands"
+.SH NAME
+vault-absorb \- add the files in a tar archive to an encrypted vault
+.SH SYNOPSIS
+.B vault absorb
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.RI [ FOLDER ]
+.B <
+.I ARCHIVE
+.SH DESCRIPTION
+.B vault absorb
+reads a tar archive from standard input and stores every regular file in
+it, beneath
+.I FOLDER
+if one is given, keeping the paths, permissions and modification times
+recorded in the archive. A gzip-compressed archive is detected and
+unpacked automatically.
+.PP
+Each file is encrypted straight from the stream; nothing is unpacked to
+disk. Anything already stored under the same name is replaced.
+.PP
+Directory entries are not stored (directories exist implicitly). Symbolic
+and hard links, devices and other special entries are reported on standard
+error and skipped, as is any entry whose name would escape
+.I FOLDER
+through
+.BR .. .
+A leading
+.B ./
+or
+.B /
+is dropped.
+.PP
+The passphrase prompt reads from the terminal, not standard input, so
+it still works with an archive piped in. The vault is locked exclusively
+for the whole run.
+.SH OPTIONS
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH EXIT STATUS
+0 if at least one file was stored and the archive was read to the end.
+1 if the archive is malformed or ends early, holds no regular files, or
+anything fails; files stored before the failure stay in the vault.
+.SH EXAMPLES
+Store a directory under
+.BR backup/photos/ :
+.PP
+.RS
+tar \-cz photos | vault absorb backup
+.RE
+.PP
+Pull a remote directory straight into the vault:
+.PP
+.RS
+ssh server 'tar \-C /etc \-c .' | vault absorb server1/etc
+.RE
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-add (1),
+.BR tar (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

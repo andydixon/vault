@@ -35,6 +35,9 @@ const usage = `Usage:
     vault mirror URL [FOLDER]       crawl a website (same host only, one request
                                     at a time) into FOLDER/HOST, rewriting its
                                     links to relative paths
+    vault absorb [FOLDER]           read a tar archive (optionally gzipped) from
+                                    standard input and add every file in it,
+                                    optionally under a folder inside the vault
     vault list [PREFIX]             list stored files
     vault get NAME [-o OUTPUT]      decrypt a stored file (default: its base name)
     vault mv OLD NEW                rename a stored file
@@ -146,6 +149,19 @@ func main() {
 		cat, err := s.catalogue()
 		check(err)
 		check(mirror(s, cat, pos[0], dest))
+	case "absorb":
+		want(0, 1)
+		if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
+			fail("absorb reads a tar archive from standard input; pipe one in")
+		}
+		dest := ""
+		if len(pos) == 1 {
+			dest = strings.Trim(pos[0], "/")
+		}
+		s := open(*keyPath, *vaultDir, true)
+		cat, err := s.catalogue()
+		check(err)
+		check(absorb(s, cat, os.Stdin, dest))
 	case "list", "ls":
 		want(0, 1)
 		prefix := ""
