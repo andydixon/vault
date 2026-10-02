@@ -50,12 +50,16 @@ vault migrate ./photos           # like add, then delete the originals
 vault mirror https://example.com/     # crawl a site into example.com/, links rewritten
 tar -cz photos | vault absorb backup  # every file in a tar (or .tar.gz) under backup/
 vault absorb backup < photos.tar.gz   # same, from an existing archive
-vault list                       # everything
+vault ls                         # the top level: folders (ending in /) and files
+vault ls work                    # one level down, inside work/
+vault list                       # every file, all the way down, full names
 vault list work                  # everything under work/
 vault get work/2026/report.pdf   # writes ./report.pdf
 vault get report.pdf -o copy.pdf
 vault mv report.pdf old/report.pdf
 vault rm old/report.pdf
+vault rm -r old                  # a whole folder; lists it and asks first
+vault rm -rf old                 # the same, without asking
 ```
 
 Commands that change the vault take an exclusive lock on `DIR/.lock`, and

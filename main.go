@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/andydixon/vault/internal/term"
 )
@@ -39,10 +40,16 @@ const usage = `Usage:
     vault absorb [FOLDER]           read a tar archive (optionally gzipped) from
                                     standard input and add every file in it,
                                     optionally under a folder inside the vault
-    vault list [PREFIX]             list stored files
+    vault ls [FOLDER]               list one folder: its files, and its
+                                    sub-folders (ending in /) with their
+                                    total size; -r lists everything under it
+    vault list [FOLDER]             list every stored file under FOLDER,
+                                    with full names
     vault get NAME [-o OUTPUT]      decrypt a stored file (default: its base name)
     vault mv OLD NEW                rename a stored file
     vault rm NAME                   delete a stored file
+    vault rm -r FOLDER [-f]         delete a folder and everything under it;
+                                    asks first unless -f (or -rf) is given
 
 Options (any command):
     --key PATH     key file (default $VAULT_KEY, else ~/.vault/key)
@@ -80,6 +87,10 @@ func main() {
 	output := fset.String("o", "", "")
 	filler := fset.String("filler", "0", "")
 	yes := fset.Bool("yes", false, "")
+	// rm's -r and -f; Go's flag package has no combined short flags, so
+	// -rf and -fr are spelled out.
+	recurse, force := fset.Bool("r", false, ""), fset.Bool("f", false, "")
+	rf, fr := fset.Bool("rf", false, ""), fset.Bool("fr", false, "")
 	pos, err := parseInterleaved(fset, args)
 	if err != nil {
 		fail("%v\n\n%s", err, usage)
@@ -178,6 +189,10 @@ func main() {
 		}
 		cat, err := open(*keyPath, *vaultDir, false).catalogue()
 		check(err)
+		if cmd == "ls" && !*recurse {
+			check(ls(os.Stdout, cat, prefix))
+			break
+		}
 		list(cat, prefix)
 	case "get":
 		want(1, 1)
@@ -191,7 +206,41 @@ func main() {
 		check(open(*keyPath, *vaultDir, true).rename(pos[0], pos[1]))
 	case "rm", "delete":
 		want(1, 1)
-		check(open(*keyPath, *vaultDir, true).delete(pos[0]))
+		recursive, forced := *recurse || *rf || *fr, *force || *rf || *fr
+		name := pos[0]
+		if recursive {
+			name = strings.Trim(name, "/")
+			if name == "" {
+				fail("refusing to remove the whole vault")
+			}
+		}
+		s := open(*keyPath, *vaultDir, true)
+		cat, err := s.catalogue()
+		check(err)
+		var names []string
+		if recursive {
+			names = under(cat, name)
+		} else if len(cat[name]) > 0 {
+			names = []string{name}
+		}
+		if len(names) == 0 {
+			if forced {
+				break
+			}
+			fail("%s: not in the vault", name)
+		}
+		var size int64
+		for _, n := range names {
+			size += cat[n][0].Size
+		}
+		if recursive && !forced && !confirm("these files will be deleted, with no undo:", names,
+			fmt.Sprintf("delete %d file(s), %s? [y/N]", len(names), humanSize(size))) {
+			fail("rm cancelled; nothing changed (-f skips the question)")
+		}
+		check(s.removeAll(cat, names, func(n string) { fmt.Fprintf(os.Stderr, "removed %s\n", n) }))
+		if recursive {
+			fmt.Fprintf(os.Stderr, "removed %d file(s), %s\n", len(names), humanSize(size))
+		}
 	case "help", "-h", "--help":
 		fmt.Println(usage)
 	default:
@@ -384,11 +433,22 @@ func addPath(s *store, cat map[string][]*record, src, dest string, migrate bool,
 // confirmOverwrite lists the vault names a migrate would replace and asks
 // on the terminal whether to go ahead. No terminal means no.
 func confirmOverwrite(names []string) bool {
-	fmt.Fprintln(os.Stderr, "these files are already in the vault and would be overwritten:")
-	for _, name := range names {
+	return confirm("these files are already in the vault and would be overwritten:", names,
+		fmt.Sprintf("overwrite %d file(s)? [y/N]", len(names)))
+}
+
+// confirm prints intro and names, the first 20 of them, then asks question
+// on the terminal. No terminal means no.
+func confirm(intro string, names []string, question string) bool {
+	fmt.Fprintln(os.Stderr, intro)
+	for i, name := range names {
+		if i == 20 {
+			fmt.Fprintf(os.Stderr, "    … and %d more\n", len(names)-i)
+			break
+		}
 		fmt.Fprintf(os.Stderr, "    %s\n", name)
 	}
-	ok, err := term.Confirm(fmt.Sprintf("overwrite %d file(s)? [y/N]", len(names)))
+	ok, err := term.Confirm(question)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cannot ask for confirmation: %v\n", err)
 	}
@@ -455,14 +515,73 @@ func addOne(s *store, cat map[string][]*record, src, name string, migrate bool) 
 	return nil
 }
 
-func list(cat map[string][]*record, prefix string) {
-	var names []string
-	for name := range cat {
-		if prefix == "" || name == prefix || strings.HasPrefix(name, prefix+"/") {
-			names = append(names, name)
+// ls prints one level of the vault, like ls(1): the files directly in
+// folder, and each sub-folder once, marked with a trailing slash and shown
+// with the total size and newest date of everything under it. Folders come
+// first. A folder that is a file's name lists just that file.
+func ls(w io.Writer, cat map[string][]*record, folder string) error {
+	type entry struct {
+		size     int64
+		modified time.Time
+	}
+	entries := map[string]*entry{}
+	for name, rs := range cat {
+		rel := name
+		switch {
+		case folder == "":
+		case name == folder:
+			rel = path.Base(name)
+		case strings.HasPrefix(name, folder+"/"):
+			rel = name[len(folder)+1:]
+		default:
+			continue
+		}
+		if i := strings.IndexByte(rel, '/'); i >= 0 {
+			rel = rel[:i+1]
+		}
+		e := entries[rel]
+		if e == nil {
+			e = &entry{}
+			entries[rel] = e
+		}
+		r := rs[0]
+		e.size += r.Size
+		if r.Modified.After(e.modified) {
+			e.modified = r.Modified
 		}
 	}
-	sort.Strings(names)
+	if len(entries) == 0 && folder != "" {
+		return fmt.Errorf("%s: not in the vault", folder)
+	}
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		di, dj := strings.HasSuffix(names[i], "/"), strings.HasSuffix(names[j], "/")
+		if di != dj {
+			return di
+		}
+		return names[i] < names[j]
+	})
+	for _, name := range names {
+		e := entries[name]
+		fmt.Fprintf(w, "%10s  %s  %s\n", humanSize(e.size), e.modified.Local().Format("2006-01-02 15:04"), name)
+	}
+	return nil
+}
+
+// list prints every file at or under prefix, with its full name.
+func list(cat map[string][]*record, prefix string) {
+	var names []string
+	if prefix == "" {
+		for name := range cat {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+	} else {
+		names = under(cat, prefix)
+	}
 	for _, name := range names {
 		r := cat[name][0]
 		fmt.Printf("%10s  %s  %s\n", humanSize(r.Size), r.Modified.Local().Format("2006-01-02 15:04"), name)

@@ -537,7 +537,53 @@ func (s *store) delete(name string) error {
 	if err != nil {
 		return err
 	}
-	return s.remove(cat, name, true)
+	return s.removeAll(cat, []string{name}, func(string) {})
+}
+
+// under returns the names in cat at or beneath the folder prefix, sorted.
+func under(cat map[string][]*record, prefix string) []string {
+	var names []string
+	for name := range cat {
+		if name == prefix || strings.HasPrefix(name, prefix+"/") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// removeAll deletes every record for names and the objects they hold, then
+// drops them from cat, calling done after each name. Like remove, but it
+// works out once which objects other records still use, so deleting a large
+// folder stays linear.
+func (s *store) removeAll(cat map[string][]*record, names []string, done func(name string)) error {
+	gone := map[string]bool{}
+	for _, name := range names {
+		gone[name] = true
+	}
+	inUse := map[string]bool{}
+	for name, rs := range cat {
+		if !gone[name] {
+			for _, r := range rs {
+				inUse[r.Seed] = true
+			}
+		}
+	}
+	for _, name := range names {
+		for _, r := range cat[name] {
+			if err := s.removeFile(recordsDir, r.id); err != nil {
+				return err
+			}
+			if !inUse[r.Seed] {
+				if err := s.dropObjects(r.Seed, r.Size); err != nil {
+					return err
+				}
+			}
+		}
+		delete(cat, name)
+		done(name)
+	}
+	return nil
 }
 
 func (s *store) rename(oldName, newName string) error {

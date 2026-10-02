@@ -1,20 +1,65 @@
-.TH VAULT-RM 1 "September 2026" "vault" "User Commands"
+.TH VAULT-RM 1 "October 2026" "vault" "User Commands"
 .SH NAME
-vault-rm \- delete a stored file
+vault-rm \- delete stored files or folders
 .SH SYNOPSIS
 .B vault rm
+.RB [ \-f ]
 .RB [ \-\-key
 .IR PATH ]
 .RB [ \-\-vault
 .IR DIR ]
 .I NAME
 .br
+.B vault rm \-r
+.RB [ \-f ]
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.I FOLDER
+.br
 .B vault delete
 \&...
 .SH DESCRIPTION
-Deletes the stored file \fINAME\fR from the vault. It does not ask for
-confirmation.
+Deletes the stored file
+.I NAME
+from the vault: its catalogue record and every encrypted object holding
+its contents, so the space is freed on disk straight away.
+.PP
+With
+.BR \-r ,
+deletes
+.I FOLDER
+and everything at or under it. Because there is no undo, it first lists
+what it will delete (the first 20 names, then a count) with the total size,
+and asks on the terminal. Anything but
+.B y
+or
+.B yes
+deletes nothing, and so does having no terminal to ask on. A trailing
+.B /
+on
+.I FOLDER
+is ignored, and
+.B vault rm \-r /
+is refused rather than emptying the vault.
+.PP
+Each deleted file is reported on standard error, and
+.B \-r
+ends with the number of files and their total size. The vault is locked
+exclusively for the whole run. A key sees only its own files, so the
+decoy passphrase never deletes real files, or the other way round.
 .SH OPTIONS
+.TP
+.B \-r
+Delete a folder and everything under it.
+.TP
+.B \-f
+Do not ask before a recursive delete, and do not fail when there is
+nothing to delete.
+.TP
+.BR \-rf ", " \-fr
+Both of the above.
 .TP
 .BI \-\-key " PATH"
 Key file. Default: $VAULT_KEY, else ~/.vault/key.
@@ -25,6 +70,19 @@ Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
 .TP
 .B VAULT_PASSPHRASE
 Passphrase, instead of prompting on the terminal.
+.SH EXIT STATUS
+0 if everything asked for was deleted, or there was nothing to delete with
+.BR \-f .
+1 if the name is not in the vault, the delete was declined, or anything
+fails; files already deleted stay deleted.
+.SH EXAMPLES
+.RS
+vault rm notes.md
+.br
+vault rm \-r old/2024          # asks first
+.br
+vault rm \-rf tmp              # no questions
+.RE
 .SH SEE ALSO
 .BR vault (1),
 .BR vault\-list (1)

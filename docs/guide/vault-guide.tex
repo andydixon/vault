@@ -63,7 +63,7 @@ Got two minutes? Here's all of it:
 $ vault genkey            # make your key (pick a good passphrase)
 $ vault init              # make your vault
 $ vault add taxes.pdf     # put something in
-$ vault list              # see what's in there
+$ vault ls                # see what's in there
 $ vault get taxes.pdf     # get it back out
 \end{shell}
 
@@ -511,11 +511,12 @@ type \cmd{--vault} again.
 
 % ======================================================================
 \chapter{Everyday moves}
-\tagline{add, list, get, mv, rm: the five commands you'll actually use}
+\tagline{add, ls, get, mv, rm: the five commands you'll actually use}
 
 \begin{tldr}
-\cmd{add} puts files in (optionally into a folder), \cmd{list} shows them,
-\cmd{get} takes one back out, \cmd{mv} renames, \cmd{rm} deletes. Each asks
+\cmd{add} puts files in (optionally into a folder), \cmd{ls} shows them a
+folder at a time, \cmd{get} takes one back out, \cmd{mv} renames, \cmd{rm}
+deletes (a whole folder with \cmd{-r}). Each asks
 for your passphrase. That's the whole daily workflow.
 \end{tldr}
 
@@ -611,17 +612,25 @@ themselves, should they live inside the folder, so \cmd{migrate} can never
 eat them. Files larger than 1\,TiB are
 refused. (If you have a single 1\,TiB file, we have questions.)
 
-\section{Seeing what's inside: \texttt{list}}
+\section{Seeing what's inside: \texttt{ls} and \texttt{list}}
 
 \begin{shell}
-$ vault list            # everything
-$ vault list letters    # just what's inside letters/
+$ vault ls              # the top level: folders (ending in /) and files
+$ vault ls letters      # one level down, inside letters/
+$ vault list            # every file, all the way down, full names
 \end{shell}
 
-Each line shows the size, the file's \emph{own} last-modified time from when
-you added it, and its name, sorted alphabetically.
+\cmd{ls} works like the shell's: it shows one folder at a time. Each
+sub-folder appears once, ending in \file{/}, with the total size of
+everything inside it and its newest date. Files show their size and their
+\emph{own} last-modified time from when you added them. Folders come first,
+then files. Keep going down with \cmd{vault ls letters/2025}.
 
-\shot{list}{The full catalogue, then just one folder}
+\cmd{list} is the whole catalogue in one go: every file under a folder,
+with its full name, sorted. It's the one to pipe into other commands, and
+\cmd{vault ls -r} does the same.
+
+\shot{list}{One level at a time with \cmd{ls}, then everything with \cmd{list}}
 
 \begin{whyso}
 \textbf{Why does \texttt{list} need my passphrase?} Because the names are
@@ -665,25 +674,31 @@ and it doesn't re-encrypt the file, so it's instant however big the file is.
 \section{Deleting: \texttt{rm}}
 
 \begin{shell}
-$ vault rm NAME
+$ vault rm NAME          # one file
+$ vault rm -r FOLDER     # a folder and everything in it; asks first
+$ vault rm -rf FOLDER    # the same, without asking
 \end{shell}
 
-Removes the file's catalogue entry and its encrypted contents. One file per
-command, on purpose. There's no recursive delete to fat-finger.
+Removes the file's catalogue entry and every encrypted piece of it, so the
+space comes back straight away.
 
 \shot{mv-rm}{Replace, move, delete, and the result}
 
 \begin{danger}
-\textbf{\texttt{rm} is immediate and there's no undo.} No recycle bin, no
-``are you sure?''. If it matters, make sure it's backed up somewhere first.
+\textbf{\texttt{rm} is immediate and there's no undo.} No recycle bin. If it
+matters, make sure it's backed up somewhere first.
 \end{danger}
 
-\begin{squirrel}
-Need to delete a whole folder? Loop over \cmd{list}. The name starts at
-character 31 of each line, so:\\
-\cmd{vault list old | cut -c31- | while read -r f; do vault rm "\$f"; done}\\
-With \env{VAULT\_PASSPHRASE} set, or it'll ask every time. See chapter 7.
-\end{squirrel}
+\subsection{Deleting a whole folder}
+\cmd{rm -r} deletes a folder and everything under it. Because that can be a
+lot, it first lists what's going (the first 20 names, then a count) with
+the total size, and asks. Anything but \texttt{y} deletes nothing, and so
+does having no terminal to ask on. \cmd{-f} skips the question, and also
+means ``don't complain if there's nothing there'', so \cmd{rm -rf} is the
+one for scripts. \cmd{vault rm -r /} is refused rather than emptying the
+vault.
+
+\shot{rm-r}{A folder deleted: vault lists it, asks, then frees the space}
 
 \section{Flags work anywhere}
 
@@ -700,7 +715,8 @@ $ vault add report.pdf --vault=~/work
 \begin{pocketlist}
   \item \cmd{add FILE [FOLDER]}: keeps the file's name, optionally in a folder. Folders add recursively.
   \item Adding an existing name replaces it, safely.
-  \item \cmd{list [FOLDER]}, \cmd{get NAME [-o OUT]}, \cmd{mv OLD NEW}, \cmd{rm NAME}.
+  \item \cmd{ls [FOLDER]} one level at a time, \cmd{list [FOLDER]} everything.
+  \item \cmd{get NAME [-o OUT]}, \cmd{mv OLD NEW}, \cmd{rm NAME}, \cmd{rm -r FOLDER}.
   \item \cmd{get} never overwrites and never publishes a half-checked file.
   \item \cmd{rm} has no undo.
 \end{pocketlist}
@@ -1213,6 +1229,8 @@ NAME: not in the vault & Check the exact name with \cmd{vault list}: it's case-s
 invalid vault path "\ldots" & Names can't start with \cmd{/} or \cmd{../}, end in \cmd{/}, or contain backslashes or control characters. \\
 \ldots: not a regular file of at most 1\,TiB & You tried to add a device, a socket or a gigantic file. \\
 \ldots\ changed while being added & The file was being written while vault read it. Try again once it's finished. \\
+refusing to remove the whole vault & \cmd{rm -r /} (or an empty folder name). Name the folder you mean. \\
+rm cancelled; nothing changed & You didn't answer \texttt{y} to \cmd{rm -r}, or there was no terminal to ask on. \cmd{-f} skips the question. \\
 skipping \ldots: not a regular file & Adding a folder: a symlink or special file was skipped. Everything else went in. \\
 passphrases do not match & The two entries differed. Nothing was created; run it again. \\
 passphrase must not be empty & Blank passphrases aren't allowed, for good reason. \\
@@ -1273,10 +1291,11 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault migrate FILE|DIR [FOLDER]}\\[2pt]\small Like add, then delete the originals. Asks before replacing.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mirror URL [FOLDER]}\\[2pt]\small Crawl a website in, links rewritten to work offline.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault absorb [FOLDER] < TAR}\\[2pt]\small Every file in a tar or .tar.gz from standard input.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Size, modified time and name, sorted.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault ls [FOLDER]}\\[2pt]\small One folder: sub-folders (ending in /) and files.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Every file under it, full names. Pipes cleanly.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get NAME [-o OUT]}\\[2pt]\small Decrypt out. Never overwrites. Verifies first.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename, using the full new name. Instant.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm NAME}\\[2pt]\small Delete one file. No undo.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm [-r] [-f] NAME}\\[2pt]\small Delete a file, or a folder with -r. Frees the space. No undo.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault help}\\[2pt]\small Show the command summary.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries man vault}\\[2pt]\small A manual page for vault and for every command.\end{tcolorbox}
 \end{tcbraster}
@@ -1291,6 +1310,8 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 -o OUT & \textrm{---} & the file's own name, here \\
 --filler SIZE & \textrm{---} & a few tens of MB, for \cmd{init} \\
 --yes & \textrm{---} & ask, for \cmd{migrate} \\
+-r & \textrm{---} & \cmd{rm}: one file; \cmd{ls}: one level \\
+-f & \textrm{---} & \cmd{rm}: ask before \cmd{-r}, fail if missing \\
 \end{vtable}
 
 \section*{Numbers worth knowing}

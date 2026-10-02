@@ -266,8 +266,9 @@ def main():
     shoot("add", t)
 
     t = Term(box)
+    t.cmd("vault ls", P)
+    t.cmd("vault ls letters", P)
     t.cmd("vault list", P)
-    t.cmd("vault list letters", P)
     shoot("list", t)
 
     t = Term(box)
@@ -314,6 +315,18 @@ def main():
         t.lines.append(esc)
     t.cmd("ls Scans")
     shoot("migrate", t)
+
+    # rm -r: lists the folder, asks, then frees the space
+    t = Term(box)
+    t.cmd("vault ls", P)
+    t.lines.append(prompt() + '<span class="c">vault rm -r receipts</span>')
+    for line in box.run_tty("vault rm -r receipts", P, "y").split("\n"):
+        esc = html.escape(line)
+        if "[y/N]" in line:
+            esc = '<span class="hl">%s</span>' % esc
+        t.lines.append(esc)
+    t.cmd("vault ls", P)
+    shoot("rm-r", t)
 
     # absorb: a tar archive piped in, here pulled from a gzipped tarball
     box.write("Projects/website/index.html", "<h1>hello</h1>\n")

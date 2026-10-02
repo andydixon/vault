@@ -9,7 +9,8 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 
 - `main.go` - CLI: `genkey`, `init`, `add` (file, directory
   or URL), `migrate` (add, then delete originals), `mirror`, `absorb` (tar
-  on stdin, `absorb.go`), `list`, `get`, `mv`, `rm`.
+  on stdin, `absorb.go`), `ls` (one folder level), `list` (recursive),
+  `get`, `mv`, `rm` (`-r` for a folder, asks unless `-f`).
 - `keyfile.go` - key file with two passphrase slots (Argon2id +
   XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
   slot is either a decoy identity or random bytes; slot order is random.

@@ -1,22 +1,64 @@
-.TH VAULT-LIST 1 "September 2026" "vault" "User Commands"
+.TH VAULT-LIST 1 "October 2026" "vault" "User Commands"
 .SH NAME
-vault-list \- list files in the vault
+vault-list, vault-ls \- list files and folders in the vault
 .SH SYNOPSIS
+.B vault ls
+.RB [ \-r ]
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.RI [ FOLDER ]
+.br
 .B vault list
 .RB [ \-\-key
 .IR PATH ]
 .RB [ \-\-vault
 .IR DIR ]
-.RI [ PREFIX ]
-.br
-.B vault ls
-\&...
+.RI [ FOLDER ]
 .SH DESCRIPTION
-Prints one line per stored file, sorted by name: human-readable size,
-modification time (local, minute resolution) and name. With \fIPREFIX\fR only
-that file, or files under that folder, are shown. Records the passphrase
-cannot open are skipped silently. Takes a shared lock.
+Both print one line per entry: human-readable size, modification time
+(local, minute resolution) and name, in fixed-width columns so the name
+always starts at character 31.
+.PP
+.B vault ls
+shows one level, like
+.BR ls (1):
+each sub-folder of
+.I FOLDER
+(the top of the vault if none is given) once, with a trailing
+.BR / ,
+and the files directly in it.
+A folder's size is the total of everything under it and its time is the
+newest among them. Names are relative to
+.IR FOLDER ,
+so
+.B vault ls photos
+then
+.B vault ls photos/2025
+walks down the tree. Folders are listed first, then files, each sorted by
+name. If
+.I FOLDER
+is a file's name, that file alone is shown.
+.PP
+.B vault list
+shows every file at or under
+.IR FOLDER ,
+recursively, with full names, sorted. It is the form to pipe into other
+commands, and
+.B vault ls \-r
+is the same.
+.PP
+Records the passphrase cannot open are skipped silently. Takes a shared lock.
 .SH OPTIONS
+.TP
+.B \-r
+.BR ls :
+list everything under
+.I FOLDER
+with full names, as
+.B vault list
+does.
 .TP
 .BI \-\-key " PATH"
 Key file. Default: $VAULT_KEY, else ~/.vault/key.
@@ -27,8 +69,23 @@ Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
 .TP
 .B VAULT_PASSPHRASE
 Passphrase, instead of prompting on the terminal.
+.SH EXIT STATUS
+0 on success. 1 if
+.B vault ls
+is given a
+.I FOLDER
+with nothing in or under it, or on any other error.
+.SH EXAMPLES
+.RS
+vault ls
+.br
+vault ls photos/2025
+.br
+vault list | cut \-c31\-        # every name, one per line
+.RE
 .SH SEE ALSO
 .BR vault (1),
-.BR vault\-get (1)
+.BR vault\-get (1),
+.BR vault\-rm (1)
 .SH AUTHOR
 Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

@@ -37,8 +37,10 @@ Crawl a website into the vault.
 Add every file in a tar archive read from standard input.
 .TP
 .BR vault\-list (1)
-List stored files (alias:
-.BR ls ).
+.B ls
+lists one folder, with sub-folders marked;
+.B list
+lists every file under a folder.
 .TP
 .BR vault\-get (1)
 Decrypt a stored file.
@@ -48,7 +50,9 @@ Rename a stored file (alias:
 .BR rename ).
 .TP
 .BR vault\-rm (1)
-Delete a stored file (alias:
+Delete a stored file, or a whole folder with
+.B \-r
+(alias:
 .BR delete ).
 .TP
 .B help

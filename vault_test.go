@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -477,5 +478,100 @@ func TestAbsorb(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(out); string(b) != "hello" {
 		t.Errorf("got %q", b)
+	}
+}
+
+func TestRemoveTree(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	objects := filepath.Join(dir, "store", "objects")
+	before := len(ciphertexts(t, objects))
+	cat, _ := s.catalogue()
+	src := filepath.Join(dir, "in")
+	big := make([]byte, chunkData+1) // two objects
+	rand.Read(big)
+	for name, body := range map[string][]byte{"a/x": big, "a/b/y": []byte("y"), "ab/z": []byte("z"), "b/w": []byte("w")} {
+		os.WriteFile(src, body, 0o600)
+		if _, err := s.add(cat, src, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(ciphertexts(t, objects)) - before; n != 5 {
+		t.Fatalf("%d objects added, want 5", n)
+	}
+
+	names := under(cat, "a")
+	if !slices.Equal(names, []string{"a/b/y", "a/x"}) {
+		t.Fatalf("under a: %v", names)
+	}
+	var done []string
+	if err := s.removeAll(cat, names, func(n string) { done = append(done, n) }); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(done, names) || len(cat) != 2 || len(cat["ab/z"]) != 1 || len(cat["b/w"]) != 1 {
+		t.Fatalf("done %v, left %v", done, cat)
+	}
+	if n := len(ciphertexts(t, objects)) - before; n != 2 {
+		t.Fatalf("%d objects left, want 2: the space was not freed", n)
+	}
+	fresh, _ := s.catalogue()
+	if len(fresh) != 2 {
+		t.Fatalf("on disk: %v", fresh)
+	}
+	out := filepath.Join(dir, "out")
+	if err := s.get("ab/z", out); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLs(t *testing.T) {
+	at := func(m int) time.Time { return time.Date(2026, 1, 1, 12, m, 0, 0, time.UTC) }
+	cat := map[string][]*record{
+		"notes.md":         {{Size: 10, Modified: at(1)}},
+		"a/x":              {{Size: 100, Modified: at(2)}},
+		"a/b/y":            {{Size: 1000, Modified: at(5)}},
+		"a/b/c/z":          {{Size: 1, Modified: at(3)}},
+		"ab/z":             {{Size: 7, Modified: at(4)}},
+		"photos/2025/img1": {{Size: 2048, Modified: at(6)}},
+	}
+	names := func(folder string) []string {
+		t.Helper()
+		var b bytes.Buffer
+		if err := ls(&b, cat, folder); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, line := range strings.Split(strings.TrimRight(b.String(), "\n"), "\n") {
+			got = append(got, strings.TrimSpace(line[10:]))
+		}
+		return got
+	}
+	day := func(m int) string { return at(m).Local().Format("2006-01-02 15:04") + "  " }
+	if got, want := names(""), []string{day(5) + "a/", day(4) + "ab/", day(6) + "photos/", day(1) + "notes.md"}; !slices.Equal(got, want) {
+		t.Fatalf("ls: %q, want %q", got, want)
+	}
+	if got, want := names("a"), []string{day(5) + "b/", day(2) + "x"}; !slices.Equal(got, want) {
+		t.Fatalf("ls a: %q, want %q", got, want)
+	}
+	if got, want := names("a/b"), []string{day(3) + "c/", day(5) + "y"}; !slices.Equal(got, want) {
+		t.Fatalf("ls a/b: %q, want %q", got, want)
+	}
+	if got, want := names("a/x"), []string{day(2) + "x"}; !slices.Equal(got, want) {
+		t.Fatalf("ls a/x: %q, want %q", got, want)
+	}
+	var b bytes.Buffer
+	ls(&b, cat, "")
+	if !strings.HasPrefix(b.String(), "   1.1 KiB  ") {
+		t.Fatalf("folder a/ should total 1101 bytes: %q", b.String())
+	}
+	if err := ls(&b, cat, "nope"); err == nil {
+		t.Fatal("ls of a missing folder succeeded")
 	}
 }
