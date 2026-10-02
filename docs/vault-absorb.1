@@ -53,6 +53,13 @@ Passphrase, instead of prompting on the terminal.
 1 if the archive is malformed or ends early, holds no regular files, or
 anything fails; files stored before the failure stay in the vault.
 .SH EXAMPLES
+Unpack an existing archive into the vault under
+.BR backup/ :
+.PP
+.RS
+vault absorb backup < photos.tar.gz
+.RE
+.PP
 Store a directory under
 .BR backup/photos/ :
 .PP
