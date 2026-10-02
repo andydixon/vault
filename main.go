@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -158,10 +159,17 @@ func main() {
 		if len(pos) == 1 {
 			dest = strings.Trim(pos[0], "/")
 		}
+		// Wait for the archive to start arriving before asking for the
+		// passphrase, so a program feeding the pipe (gpg, ssh) has finished
+		// with the terminal and cannot bury the prompt.
+		in := bufio.NewReader(os.Stdin)
+		if _, err := in.Peek(1); err != nil {
+			fail("nothing to absorb on standard input")
+		}
 		s := open(*keyPath, *vaultDir, true)
 		cat, err := s.catalogue()
 		check(err)
-		check(absorb(s, cat, os.Stdin, dest))
+		check(absorb(s, cat, in, dest))
 	case "list", "ls":
 		want(0, 1)
 		prefix := ""

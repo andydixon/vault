@@ -581,7 +581,11 @@ vault absorb old < archive.tar.gz
 
 Each file is encrypted straight from the stream, so nothing is unpacked to
 disk first. Directories need no entry of their own; links, devices and any
-name that tries to climb out with \file{..} are skipped with a note. If the
+name that tries to climb out with \file{..} are skipped with a note.
+vault asks for your passphrase only once the archive starts arriving, so
+when it comes out of something that asks first, like
+\cmd{gpg --decrypt secrets.tar.gpg | vault absorb}, gpg's prompt comes
+and goes before vault's appears. If the
 archive stops halfway through a file, that file isn't stored and vault
 stops; everything before it is already safely in.
 

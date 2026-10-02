@@ -35,8 +35,12 @@ or
 is dropped.
 .PP
 The passphrase prompt reads from the terminal, not standard input, so
-it still works with an archive piped in. The vault is locked exclusively
-for the whole run.
+it still works with an archive piped in. It waits until the archive starts
+arriving, so a program feeding the pipe, such as
+.BR gpg (1)
+asking for its own passphrase, has finished with the terminal first.
+An empty pipe fails without asking at all.
+The vault is locked exclusively for the whole run.
 .SH OPTIONS
 .TP
 .BI \-\-key " PATH"
