@@ -567,6 +567,8 @@ the whole site, one request at a time, into a folder named after its host.
 Links inside pages and stylesheets are rewritten to relative paths, so the
 copy still browses once you get it out. Only the same host is followed.
 
+\shot{mirror}{Mirroring a small site. The links in each page now point at the copy.}
+
 \subsection{From a tar archive: \texttt{absorb}}
 \cmd{absorb} reads a tar archive, gzipped or not, from standard input and
 stores every plain file in it, optionally under a folder:
@@ -582,6 +584,8 @@ disk first. Directories need no entry of their own; links, devices and any
 name that tries to climb out with \file{..} are skipped with a note. If the
 archive stops halfway through a file, that file isn't stored and vault
 stops; everything before it is already safely in.
+
+\shot{absorb}{A gzipped tarball and a plain tar stream, both absorbed.}
 
 \subsection{Moving in: \texttt{migrate}}
 \cmd{migrate} works exactly like \cmd{add}, but deletes each original once
@@ -956,7 +960,8 @@ covered.
 
 \section{Locking is automatic}
 
-Commands that change the vault (\cmd{add}, \cmd{mv}, \cmd{rm}) take an
+Commands that change the vault (\cmd{add}, \cmd{migrate}, \cmd{mirror},
+\cmd{absorb}, \cmd{mv}, \cmd{rm}) take an
 \hl{exclusive} lock. Commands that only read (\cmd{list}, \cmd{get}) take a
 \hl{shared} one, so several can read at once. If a command has to wait, it
 says so, then carries on by itself:
@@ -1260,12 +1265,16 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
   enhanced,colback=vmist,colframe=vline,boxrule=0.4pt,arc=4pt,left=9pt,right=9pt,top=7pt,bottom=7pt]
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault genkey}\\[2pt]\small Make a key. Asks for a passphrase and an optional decoy.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault init}\\[2pt]\small Make an empty vault, with filler. \texttt{--filler 2G} for more.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault add FILE|DIR [FOLDER]}\\[2pt]\small Encrypt in, keeping the name. Replaces an existing name.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault add FILE|DIR|URL [FOLDER]}\\[2pt]\small Encrypt in, keeping the name. Replaces an existing name.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault migrate FILE|DIR [FOLDER]}\\[2pt]\small Like add, then delete the originals. Asks before replacing.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mirror URL [FOLDER]}\\[2pt]\small Crawl a website in, links rewritten to work offline.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault absorb [FOLDER] < TAR}\\[2pt]\small Every file in a tar or .tar.gz from standard input.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Size, modified time and name, sorted.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get NAME [-o OUT]}\\[2pt]\small Decrypt out. Never overwrites. Verifies first.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename, using the full new name. Instant.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm NAME}\\[2pt]\small Delete one file. No undo.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault help}\\[2pt]\small Show the command summary.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries man vault}\\[2pt]\small A manual page for vault and for every command.\end{tcolorbox}
 \end{tcbraster}
 
 \section*{Options and variables}
@@ -1277,6 +1286,7 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \textrm{(genkey prompt)} & VAULT\_DECOY\_PASSPHRASE & asked; empty means none \\
 -o OUT & \textrm{---} & the file's own name, here \\
 --filler SIZE & \textrm{---} & a few tens of MB, for \cmd{init} \\
+--yes & \textrm{---} & ask, for \cmd{migrate} \\
 \end{vtable}
 
 \section*{Numbers worth knowing}
