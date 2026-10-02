@@ -10,7 +10,13 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
 - `main.go` - CLI: `genkey`, `init`, `add` (file, directory
   or URL), `migrate` (add, then delete originals), `mirror`, `absorb` (tar
   on stdin, `absorb.go`), `ls` (one folder level), `list` (recursive),
-  `get`, `mv`, `rm` (`-r` for a folder, asks unless `-f`).
+  `get` (`-r` for a folder), `mv`/`cp` (files or folders; `transfers`
+  resolves names like mv(1), copies share objects), `rm` (`-r` for a
+  folder, asks unless `-f`), `unlock`/`lock`.
+- `agent*.go` - `vault unlock` re-executes itself as a hidden `__agent`
+  process holding the suite ID and seed (pipe in, mlocked, undumpable) and
+  serving them on a Unix socket in a 0700 per-user dir until a hard
+  deadline. `keyIdentity` asks it first unless `$VAULT_PASSPHRASE` is set.
 - `keyfile.go` - key file with two passphrase slots (Argon2id +
   XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
   slot is either a decoy identity or random bytes; slot order is random.
@@ -49,7 +55,7 @@ export VAULT_PASSPHRASE=test VAULT_KEY=$PWD/k VAULT_DIR=$PWD/s
 
 ## Invariants
 
-- Never write a seed or private key unencrypted.
+- Never write a seed or private key unencrypted (the agent gets it by pipe).
 - Keep suite IDs, stanza tags, HKDF info strings and `fileKeySize` (32) stable.
 - Every ciphertext's and shard directory's mtime is pinned to the epoch;
   records stay one fixed size; objects stay at most 4 MiB and bucket-padded.

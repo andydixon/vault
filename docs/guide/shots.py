@@ -387,6 +387,23 @@ def main():
     t.cmd("vault get nope 2>/dev/null; echo \"exit code: $?\"", P)
     shoot("scripting", t)
 
+    # cp, folder mv, get -r
+    t = Term(box)
+    t.cmd("vault cp -r letters archive/2025", P)
+    t.cmd("vault mv ideas/notes.md archive/", P)
+    t.cmd("vault ls archive", P)
+    t.cmd("vault get -r archive -o restored/archive", P)
+    shoot("cp-mv", t)
+
+    # unlock: one passphrase, then commands stop asking until lock
+    t = Term(box)
+    t.cmd("vault unlock", P)
+    t.cmd("vault ls")
+    t.cmd("vault get archive/notes.md -o /tmp/notes.md")
+    t.cmd("vault lock")
+    t.moment("vault ls", "Enter passphrase:")
+    shoot("unlock", t)
+
     # building, into a temporary OUT so an existing dist/ is left alone
     rel = tempfile.mkdtemp(prefix="vault-release-")
     targets = "linux/amd64 linux/arm darwin/arm64 windows/amd64"

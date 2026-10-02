@@ -1,0 +1,37 @@
+.TH VAULT-CP 1 "September 2026" "vault" "User Commands"
+.SH NAME
+vault-cp \- copy a stored file or folder
+.SH SYNOPSIS
+.B vault cp
+.RB [ \-r ]
+.RB [ \-\-key
+.IR PATH ]
+.RB [ \-\-vault
+.IR DIR ]
+.I OLD NEW
+.SH DESCRIPTION
+Copies \fIOLD\fR to \fINEW\fR, following the same naming rules as
+.BR vault\-mv (1).
+A folder needs \fB\-r\fR. The copy shares the original's encrypted
+objects rather than re-encrypting them, so it is instant and takes no
+extra space; deleting either name leaves the other intact.
+.SH OPTIONS
+.TP
+.B \-r
+Copy a folder and everything under it.
+.TP
+.BI \-\-key " PATH"
+Key file. Default: $VAULT_KEY, else ~/.vault/key.
+.TP
+.BI \-\-vault " DIR"
+Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase, instead of prompting on the terminal.
+.SH SEE ALSO
+.BR vault (1),
+.BR vault\-mv (1),
+.BR vault\-rm (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

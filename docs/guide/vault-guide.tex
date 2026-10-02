@@ -511,13 +511,14 @@ type \cmd{--vault} again.
 
 % ======================================================================
 \chapter{Everyday moves}
-\tagline{add, ls, get, mv, rm: the five commands you'll actually use}
+\tagline{add, ls, get, mv, cp, rm: the commands you'll actually use}
 
 \begin{tldr}
 \cmd{add} puts files in (optionally into a folder), \cmd{ls} shows them a
-folder at a time, \cmd{get} takes one back out, \cmd{mv} renames, \cmd{rm}
-deletes (a whole folder with \cmd{-r}). Each asks
-for your passphrase. That's the whole daily workflow.
+folder at a time, \cmd{get} takes them back out, \cmd{mv} and \cmd{cp} move
+and copy, \cmd{rm} deletes (folders with \cmd{-r} throughout). Each asks for
+your passphrase, unless you've run \cmd{unlock}. That's the whole daily
+workflow.
 \end{tldr}
 
 \section{Putting things in: \texttt{add}}
@@ -643,6 +644,7 @@ than a thief can.
 \begin{shell}
 $ vault get NAME               # writes the file here, under its own name
 $ vault get NAME -o OUTPUT     # writes it wherever you say
+$ vault get -r FOLDER          # a whole folder, into ./FOLDER
 \end{shell}
 
 \shot{get}{Getting files back, including vault refusing to overwrite}
@@ -660,16 +662,23 @@ Three safety habits are built in, so you don't need to think about them:
         and modification time.
 \end{checks}
 
-\section{Renaming and moving: \texttt{mv}}
+\section{Renaming, moving and copying: \texttt{mv} and \texttt{cp}}
 
 \begin{shell}
-$ vault mv OLD NEW
+$ vault mv OLD NEW         # rename a file or a whole folder
+$ vault mv notes.md ideas/ # move into a folder, keeping the name
+$ vault cp OLD NEW         # copy a file
+$ vault cp -r OLD NEW      # copy a folder
 \end{shell}
 
-\cmd{NEW} is the \emph{full} new name, folder included. So to move
-\file{notes.md} into \file{ideas}, it's \cmd{vault mv notes.md
-ideas/notes.md}, not \cmd{\ldots\ ideas/}. It won't overwrite an existing name,
-and it doesn't re-encrypt the file, so it's instant however big the file is.
+They work like the everyday \cmd{mv} and \cmd{cp}: if \cmd{NEW} ends in
+\cmd{/} or is a folder already, \cmd{OLD} goes inside it. Neither will
+overwrite an existing name, and neither re-encrypts anything, so both are
+instant however big the files are. A copy shares the original's encrypted
+data, so it takes no extra space, and deleting one leaves the other intact.
+\cmd{get -r} brings a whole folder back out, keeping its shape.
+
+\shot{cp-mv}{A folder copied, a file moved into it, and the lot brought back out}
 
 \section{Deleting: \texttt{rm}}
 
@@ -700,6 +709,47 @@ vault.
 
 \shot{rm-r}{A folder deleted: vault lists it, asks, then frees the space}
 
+\section{Not typing your passphrase every time: \texttt{unlock}}
+
+\begin{shell}
+$ vault unlock             # ask once, remember the key for 5 minutes
+$ vault unlock --for 30m   # or for as long as you say
+$ vault lock               # forget it right now
+\end{shell}
+
+After \cmd{unlock}, every command skips the passphrase prompt until the time
+is up. It's a hard deadline, counted from when you unlocked, not from when you
+last used it, so a laptop left open still locks itself. Run \cmd{unlock}
+again to start a fresh countdown.
+
+\shot{unlock}{Unlock once, work without prompts, lock when you're done}
+
+\subsection{How it keeps the key safe}
+\cmd{unlock} starts a small helper process, much like \cmd{ssh-agent}, that
+holds your unlocked key in memory and nowhere else:
+
+\begin{checks}
+  \item \textbf{Never on disk.} The key goes from \cmd{unlock} to the helper
+        through a pipe. Its memory is locked so it can't be swapped out, and
+        on Linux the helper can't be debugged or core-dumped, even by you.
+  \item \textbf{Only you can reach it.} It answers on a socket inside a folder
+        only your user account can open (in \file{\$XDG\_RUNTIME\_DIR}, or
+        your temporary folder). vault checks that folder's owner and
+        permissions every time.
+  \item \textbf{It wipes itself.} At the deadline, or on \cmd{vault lock}, the
+        key is overwritten and the helper exits. Rebooting ends it too.
+  \item \textbf{An explicit passphrase wins.} If \env{VAULT\_PASSPHRASE} is
+        set, vault uses that and ignores the helper, so scripts behave
+        exactly as before.
+\end{checks}
+
+\begin{headsup}
+\textbf{While it's unlocked, anyone at your keyboard is you.} Anything
+running as your user can use the key without a passphrase. Lock before you
+walk away, and before handing your machine to anyone, decoy or not (see
+\emph{The honest limits} in the next chapter).
+\end{headsup}
+
 \section{Flags work anywhere}
 
 Every command understands \cmd{--key PATH} and \cmd{--vault DIR}, and they can
@@ -716,7 +766,8 @@ $ vault add report.pdf --vault=~/work
   \item \cmd{add FILE [FOLDER]}: keeps the file's name, optionally in a folder. Folders add recursively.
   \item Adding an existing name replaces it, safely.
   \item \cmd{ls [FOLDER]} one level at a time, \cmd{list [FOLDER]} everything.
-  \item \cmd{get NAME [-o OUT]}, \cmd{mv OLD NEW}, \cmd{rm NAME}, \cmd{rm -r FOLDER}.
+  \item \cmd{get [-r] NAME [-o OUT]}, \cmd{mv OLD NEW}, \cmd{cp [-r] OLD NEW}, \cmd{rm NAME}, \cmd{rm -r FOLDER}.
+  \item \cmd{unlock} remembers the key for 5 minutes; \cmd{lock} forgets it.
   \item \cmd{get} never overwrites and never publishes a half-checked file.
   \item \cmd{rm} has no undo.
 \end{pocketlist}
@@ -857,6 +908,9 @@ something was.
 \begin{nopes}
   \item It won't help if someone saw you type the real passphrase, or has
         malware on your machine.
+  \item It won't help if the real key is still unlocked. A command run
+        while \cmd{vault unlock} holds it uses the real key, whatever
+        passphrase you're asked to give. Run \cmd{vault lock} first.
   \item It doesn't stop anyone deleting the raw files. It hides; it doesn't guard.
   \item It isn't legal advice. Some places treat misleading an official as an
         offence in its own right. Know where you are.
@@ -886,7 +940,7 @@ it worked.
 
 \begin{vtable}{>{\leavevmode\ttfamily\small\color{vvioletdeep}}p{50mm}Y}
 \thead{VARIABLE} & \thead{WHAT IT DOES} \\ \midrule
-VAULT\_PASSPHRASE & The passphrase. Skips the prompt. With \cmd{genkey}, it's the new key's passphrase. \\
+VAULT\_PASSPHRASE & The passphrase. Skips the prompt, and any key held by \cmd{vault unlock}. With \cmd{genkey}, it's the new key's passphrase. \\
 VAULT\_DECOY\_PASSPHRASE & \cmd{genkey} only: the decoy passphrase. If \env{VAULT\_PASSPHRASE} is set and this isn't, no decoy is made. \\
 VAULT\_KEY & The key file. Default \file{\tld/.vault/key}. Same as \cmd{--key}. \\
 VAULT\_DIR & The vault folder. Default \file{\tld/.vault/store}. Same as \cmd{--vault}. \\
@@ -1225,18 +1279,29 @@ open \ldots/key: no such file or directory & No key there yet. Run \cmd{vault ge
 \ldots\ is not a vault; run vault init & Wrong \cmd{--vault} or \env{VAULT\_DIR}, or you haven't run \cmd{init} yet. \\
 \ldots\ is already a vault & You ran \cmd{init} on an existing vault. Nothing was changed. \\
 NAME: not in the vault & Check the exact name with \cmd{vault list}: it's case-sensitive and includes the folder. Or you typed the other passphrase. \\
-\ldots\ already exists & \cmd{get}: the output file exists, so use \cmd{-o}. \cmd{mv}: the new name is taken. \cmd{genkey}: you already have a key. \\
+\ldots\ already exists & \cmd{get}: the output file exists, so use \cmd{-o}. \cmd{mv}, \cmd{cp}: the new name is taken. \cmd{genkey}: you already have a key. \\
 invalid vault path "\ldots" & Names can't start with \cmd{/} or \cmd{../}, end in \cmd{/}, or contain backslashes or control characters. \\
 \ldots: not a regular file of at most 1\,TiB & You tried to add a device, a socket or a gigantic file. \\
 \ldots\ changed while being added & The file was being written while vault read it. Try again once it's finished. \\
+\ldots\ is a folder; use -r & \cmd{cp} copies a folder only with \cmd{-r}. \\
+cannot put \ldots\ inside itself & You tried to move or copy a folder into itself. \\
 refusing to remove the whole vault & \cmd{rm -r /} (or an empty folder name). Name the folder you mean. \\
 rm cancelled; nothing changed & You didn't answer \texttt{y} to \cmd{rm -r}, or there was no terminal to ask on. \cmd{-f} skips the question. \\
 skipping \ldots: not a regular file & Adding a folder: a symlink or special file was skipped. Everything else went in. \\
+\end{vtable}
+
+\subsection{Passphrases, the unlock helper, and damage}
+
+\begin{vtable}{>{\ttfamily\footnotesize}p{58mm}Y}
+\thead{MESSAGE} & \thead{WHAT IT MEANS, AND THE FIX} \\ \midrule
 passphrases do not match & The two entries differed. Nothing was created; run it again. \\
 passphrase must not be empty & Blank passphrases aren't allowed, for good reason. \\
 decoy passphrase must differ from the passphrase & The decoy can't be the same as the real one. \\
 VAULT\_PASSPHRASE is set but empty & Unset it, or give it a value. \\
 could not read passphrase (set VAULT\_PASSPHRASE\ldots) & No terminal to ask on, typically cron or CI. Set the variable. \\
+\ldots\ is not a private directory of this user & The folder for \cmd{unlock}'s socket belongs to someone else or is open to others. Someone may be up to something; check who made it. Commands still work, asking for the passphrase. \\
+agent did not start: \ldots & \cmd{unlock} couldn't start its helper. The reason follows; commands still work, asking for the passphrase. \\
+nothing was unlocked & \cmd{vault lock} found nothing to lock. Not an error. \\
 waiting for another vault process to finish & Not an error. Another command is writing; this one continues when it's done. \\
 vault still locked after a minute\ldots & Plan~9 and WebAssembly only. If nothing else is running, delete the file it names. \\
 skipping unreadable record \ldots & A catalogue entry is damaged. Everything else still works; restore \file{records/} from backup to recover that file. \\
@@ -1293,9 +1358,12 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault absorb [FOLDER] < TAR}\\[2pt]\small Every file in a tar or .tar.gz from standard input.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault ls [FOLDER]}\\[2pt]\small One folder: sub-folders (ending in /) and files.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault list [FOLDER]}\\[2pt]\small Every file under it, full names. Pipes cleanly.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get NAME [-o OUT]}\\[2pt]\small Decrypt out. Never overwrites. Verifies first.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename, using the full new name. Instant.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault get [-r] NAME [-o OUT]}\\[2pt]\small Decrypt out, or a folder with -r. Never overwrites. Verifies first.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename or move a file or folder. Instant.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault cp [-r] OLD NEW}\\[2pt]\small Copy a file, or a folder with -r. Instant, no extra space.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm [-r] [-f] NAME}\\[2pt]\small Delete a file, or a folder with -r. Frees the space. No undo.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault unlock [--for 5m]}\\[2pt]\small Remember the key, so commands stop asking. Hard deadline.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault lock}\\[2pt]\small Forget the remembered key now.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault help}\\[2pt]\small Show the command summary.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries man vault}\\[2pt]\small A manual page for vault and for every command.\end{tcolorbox}
 \end{tcbraster}
@@ -1310,7 +1378,8 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 -o OUT & \textrm{---} & the file's own name, here \\
 --filler SIZE & \textrm{---} & a few tens of MB, for \cmd{init} \\
 --yes & \textrm{---} & ask, for \cmd{migrate} \\
--r & \textrm{---} & \cmd{rm}: one file; \cmd{ls}: one level \\
+-r & \textrm{---} & \cmd{rm}, \cmd{get}, \cmd{cp}: one file; \cmd{ls}: one level \\
+--for DURATION & \textrm{---} & \cmd{5m}, for \cmd{unlock} \\
 -f & \textrm{---} & \cmd{rm}: ask before \cmd{-r}, fail if missing \\
 \end{vtable}
 

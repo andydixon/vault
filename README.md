@@ -56,10 +56,16 @@ vault list                       # every file, all the way down, full names
 vault list work                  # everything under work/
 vault get work/2026/report.pdf   # writes ./report.pdf
 vault get report.pdf -o copy.pdf
+vault get -r work                # a whole folder, into ./work
 vault mv report.pdf old/report.pdf
+vault mv report.pdf old/         # the same: into a folder, like mv(1)
+vault mv work archive/work       # folders move too
+vault cp -r work work-backup     # instant; copies share their encrypted data
 vault rm old/report.pdf
 vault rm -r old                  # a whole folder; lists it and asks first
 vault rm -rf old                 # the same, without asking
+vault unlock                     # remember the key for 5 minutes (--for 30m)
+vault lock                       # forget it now
 ```
 
 Commands that change the vault take an exclusive lock on `DIR/.lock`, and
@@ -76,6 +82,16 @@ existing file and writes nothing until the whole object has authenticated.
 `$VAULT_KEY` and `$VAULT_DIR`, then to `~/.vault/key` and `~/.vault/store`.
 The passphrase is read from the terminal, or from `$VAULT_PASSPHRASE` for
 scripts.
+
+`vault unlock` asks once, then starts a helper process, like `ssh-agent`,
+that holds the unlocked key in memory until a hard deadline (5 minutes by
+default) or `vault lock`. Until then commands skip the prompt, unless
+`$VAULT_PASSPHRASE` is set, which always wins. The key reaches the helper
+over a pipe and never touches the disk; the helper's memory is locked
+against swapping, it cannot be core-dumped (or, on Linux, debugged), and it
+answers only on a socket in a directory private to your user. While it is
+unlocked, anything running as you can use the vault, decoy or not, so lock
+before handing the machine over.
 
 ## Decoy passphrase
 

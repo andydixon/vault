@@ -3,6 +3,7 @@
 vault-get \- decrypt a stored file
 .SH SYNOPSIS
 .B vault get
+.RB [ \-r ]
 .RB [ \-o
 .IR OUTPUT ]
 .RB [ \-\-key
@@ -14,10 +15,19 @@ vault-get \- decrypt a stored file
 Decrypts \fINAME\fR. Nothing appears at the output path until every object has
 authenticated. The stored mode and modification time are restored. It refuses
 to overwrite an existing file. Takes a shared lock.
+.PP
+With \fB\-r\fR, \fINAME\fR is a folder, and every file under it is
+decrypted into the output directory, keeping the folder structure. Each file
+is checked as above; a clash stops the run, leaving the files already
+written.
 .SH OPTIONS
 .TP
 .BI \-o " OUTPUT"
-Output path. Default: the base name of \fINAME\fR in the current directory.
+Output path, or with \fB\-r\fR output directory. Default: the base name of
+\fINAME\fR in the current directory.
+.TP
+.B \-r
+Decrypt a folder and everything under it.
 .PP
 See also \fB\-\-key\fR and \fB\-\-vault\fR in
 .BR vault (1).

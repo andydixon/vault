@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"io/fs"
 	"net/http"
@@ -75,7 +76,11 @@ func TestStoreLifecycle(t *testing.T) {
 	if cat, _ = s.catalogue(); len(cat) != 2 || len(cat["a/b"]) != 1 {
 		t.Fatalf("catalogue = %v", cat)
 	}
-	if err := s.rename("a/b", "d"); err != nil {
+	pairs, err := transfers(cat, "a/b", "d", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.copyAll(cat, pairs, true, func(string, string) {}); err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(dir, "out")
@@ -573,5 +578,115 @@ func TestLs(t *testing.T) {
 	}
 	if err := ls(&b, cat, "nope"); err == nil {
 		t.Fatal("ls of a missing folder succeeded")
+	}
+}
+
+func TestCopyMove(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := initStore(filepath.Join(dir, "store"), 0); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestStore(t, keyPath, "pass")
+	cat, _ := s.catalogue()
+	src := filepath.Join(dir, "in")
+	for _, name := range []string{"a/x", "a/b/y", "ab/z", "c/w"} {
+		os.WriteFile(src, []byte(name), 0o600)
+		if _, err := s.add(cat, src, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(src, dst string, recursive, move bool) error {
+		pairs, err := transfers(cat, src, dst, recursive)
+		if err != nil {
+			return err
+		}
+		return s.copyAll(cat, pairs, move, func(string, string) {})
+	}
+	for _, bad := range [][2]string{{"a", "d"}, {"a/x", "ab/z"}, {"nope", "d"}, {"", "d"}} {
+		if run(bad[0], bad[1], false, false) == nil {
+			t.Errorf("cp %s %s succeeded", bad[0], bad[1])
+		}
+	}
+	if run("a", "a/b", true, true) == nil {
+		t.Error("moved a folder into itself")
+	}
+	if err := run("a", "d", true, false); err != nil { // cp -r a d
+		t.Fatal(err)
+	}
+	if err := run("d", "c/", true, true); err != nil { // mv d c/
+		t.Fatal(err)
+	}
+	if err := run("ab/z", "c", false, true); err != nil { // mv ab/z into existing folder c
+		t.Fatal(err)
+	}
+	if err := s.removeAll(cat, under(cat, "a"), func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	fresh, _ := s.catalogue()
+	var names []string
+	for n := range fresh {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	if want := []string{"c/d/b/y", "c/d/x", "c/w", "c/z"}; !slices.Equal(names, want) {
+		t.Fatalf("names %v, want %v", names, want)
+	}
+	out := filepath.Join(dir, "out")
+	if err := s.get("c/d/x", out); err != nil {
+		t.Fatal("copy lost its data when the original went: ", err)
+	}
+	if b, _ := os.ReadFile(out); string(b) != "a/x" {
+		t.Errorf("got %q", b)
+	}
+}
+
+func TestAgent(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	t.Setenv(passphraseEnv, "") // restored after the test
+	os.Unsetenv(passphraseEnv)  // so keyIdentity asks the agent
+	keyPath := filepath.Join(dir, "key")
+	if err := writeKeyFile(keyPath, "pass", ""); err != nil {
+		t.Fatal(err)
+	}
+	id, err := unlockKeyFile(keyPath, "pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agentIdentity(keyPath); err == nil {
+		t.Fatal("identity from an agent that is not running")
+	}
+	sock, err := agentSocket(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := binary.BigEndian.AppendUint16(nil, id.SuiteID())
+	secret = append(secret, id.Seed()...)
+	pr, pw := io.Pipe()
+	stopped := make(chan struct{})
+	go func() { runAgent(sock, "1m", bytes.NewReader(secret), pw); close(stopped) }()
+	if msg, _ := io.ReadAll(pr); string(msg) != "ok" {
+		t.Fatalf("agent said %q", msg)
+	}
+	got, err := keyIdentity(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got.Seed(), id.Seed()) || got.SuiteID() != id.SuiteID() {
+		t.Fatal("agent returned a different key")
+	}
+	if !agentStop(keyPath) {
+		t.Fatal("agent was not running")
+	}
+	<-stopped
+	if _, err := os.Stat(sock); !os.IsNotExist(err) {
+		t.Fatal("socket left behind")
+	}
+	if agentStop(keyPath) {
+		t.Fatal("agent still running")
 	}
 }

@@ -1,0 +1,57 @@
+.TH VAULT-UNLOCK 1 "October 2026" "vault" "User Commands"
+.SH NAME
+vault-unlock, vault-lock \- remember the unlocked key for a while, or forget it
+.SH SYNOPSIS
+.B vault unlock
+.RB [ \-\-for
+.IR DURATION ]
+.RB [ \-\-key
+.IR PATH ]
+.br
+.B vault lock
+.RB [ \-\-key
+.IR PATH ]
+.SH DESCRIPTION
+.B unlock
+asks for the passphrase, checks it, and starts a helper process, much like
+.BR ssh\-agent (1),
+that holds the unlocked key in memory until \fIDURATION\fR has passed
+(default 5m). Until then every command using the same key file skips the
+passphrase prompt. The deadline is fixed when you unlock; using the key does
+not extend it. Running
+.B unlock
+again replaces the helper with a fresh one.
+.PP
+.B lock
+tells the helper to wipe the key and exit at once.
+.PP
+The key reaches the helper over a pipe and is never written to disk. Its
+memory is locked against swapping and excluded from core dumps; on Linux the
+helper is also not debuggable. It answers only on a Unix socket inside
+\fI$XDG_RUNTIME_DIR/vault-UID\fR (or the temporary directory), a directory
+that must belong to this user with mode 0700. Rebooting ends it too.
+.PP
+While the key is unlocked, any program running as this user can use it, and
+it is whichever key the passphrase opened, real or decoy. Lock before
+handing the machine to anyone.
+.SH OPTIONS
+.TP
+.BI \-\-for " DURATION"
+How long to remember the key, such as 90s, 5m or 2h. Default 5m.
+.PP
+See also \fB\-\-key\fR in
+.BR vault (1).
+.SH ENVIRONMENT
+.TP
+.B VAULT_PASSPHRASE
+Passphrase for
+.BR unlock .
+When set for any other command, it is used instead of the remembered key.
+.TP
+.B XDG_RUNTIME_DIR
+Where the helper's socket directory goes.
+.SH SEE ALSO
+.BR vault (1),
+.BR ssh\-agent (1)
+.SH AUTHOR
+Andy Dixon <vault@dixon.cx>, https://www.dixon.cx

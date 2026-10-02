@@ -46,16 +46,27 @@ const usage = `Usage:
     vault list [FOLDER]             list every stored file under FOLDER,
                                     with full names
     vault get NAME [-o OUTPUT]      decrypt a stored file (default: its base name)
-    vault mv OLD NEW                rename a stored file
+    vault get -r FOLDER [-o DIR]    decrypt a folder and everything under it
+                                    into DIR (default: the folder's base name)
+    vault mv OLD NEW                rename or move a file or folder; NEW
+                                    ending in / or naming an existing folder
+                                    moves OLD into it
+    vault cp [-r] OLD NEW           copy a file, or with -r a folder, like mv;
+                                    copies share their encrypted data
     vault rm NAME                   delete a stored file
     vault rm -r FOLDER [-f]         delete a folder and everything under it;
                                     asks first unless -f (or -rf) is given
+    vault unlock [--for DURATION]   remember the passphrase for DURATION
+                                    (default 5m), so commands skip asking
+    vault lock                      forget it now
 
 Options (any command):
     --key PATH     key file (default $VAULT_KEY, else ~/.vault/key)
     --vault DIR    vault directory (default $VAULT_DIR, else ~/.vault/store)
 
-The passphrase is read from the terminal, or from $VAULT_PASSPHRASE.
+The passphrase is read from the terminal, or from $VAULT_PASSPHRASE. After
+vault unlock, commands use the remembered key instead, unless
+$VAULT_PASSPHRASE is set.
 
 Decoy passphrase: genkey offers a second, optional passphrase
 ($VAULT_DECOY_PASSPHRASE when scripted). It unlocks a separate key, so
@@ -80,6 +91,10 @@ func main() {
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
+	if cmd == agentCmd && len(args) == 2 {
+		runAgent(args[0], args[1], os.Stdin, os.Stdout)
+		return
+	}
 	fset := flag.NewFlagSet("vault "+cmd, flag.ContinueOnError)
 	fset.SetOutput(io.Discard)
 	keyPath := fset.String("key", defaultPath("VAULT_KEY", "key"), "")
@@ -87,6 +102,7 @@ func main() {
 	output := fset.String("o", "", "")
 	filler := fset.String("filler", "0", "")
 	yes := fset.Bool("yes", false, "")
+	ttl := fset.Duration("for", 5*time.Minute, "")
 	// rm's -r and -f; Go's flag package has no combined short flags, so
 	// -rf and -fr are spelled out.
 	recurse, force := fset.Bool("r", false, ""), fset.Bool("f", false, "")
@@ -113,6 +129,7 @@ func main() {
 			fail("decoy passphrase must differ from the passphrase")
 		}
 		check(writeKeyFile(*keyPath, pass, decoy))
+		agentStop(*keyPath) // one left from an old key at this path would serve it
 		fmt.Fprintf(os.Stderr, "key written to %s\n", *keyPath)
 	case "init":
 		want(0, 0)
@@ -198,12 +215,40 @@ func main() {
 		want(1, 1)
 		out := *output
 		if out == "" {
-			out = path.Base(pos[0])
+			out = path.Base(strings.TrimRight(pos[0], "/"))
 		}
-		check(open(*keyPath, *vaultDir, false).get(pos[0], out))
-	case "mv", "rename":
+		s := open(*keyPath, *vaultDir, false)
+		if !*recurse {
+			check(s.get(pos[0], out))
+			break
+		}
+		cat, err := s.catalogue()
+		check(err)
+		folder := strings.Trim(pos[0], "/")
+		names := under(cat, folder)
+		if folder == "" || len(names) == 0 || len(cat[folder]) > 0 {
+			fail("%s: not a folder in the vault", pos[0])
+		}
+		for _, n := range names {
+			dst := filepath.Join(out, filepath.FromSlash(n[len(folder)+1:]))
+			check(os.MkdirAll(filepath.Dir(dst), 0o700))
+			check(s.getRecord(cat[n][0], dst))
+			fmt.Fprintf(os.Stderr, "extracted %s\n", dst)
+		}
+	case "mv", "rename", "cp":
 		want(2, 2)
-		check(open(*keyPath, *vaultDir, true).rename(pos[0], pos[1]))
+		s := open(*keyPath, *vaultDir, true)
+		cat, err := s.catalogue()
+		check(err)
+		pairs, err := transfers(cat, pos[0], pos[1], cmd != "cp" || *recurse)
+		check(err)
+		verb := "copied"
+		if cmd != "cp" {
+			verb = "moved"
+		}
+		check(s.copyAll(cat, pairs, cmd != "cp", func(from, to string) {
+			fmt.Fprintf(os.Stderr, "%s %s -> %s\n", verb, from, to)
+		}))
 	case "rm", "delete":
 		want(1, 1)
 		recursive, forced := *recurse || *rf || *fr, *force || *rf || *fr
@@ -241,11 +286,76 @@ func main() {
 		if recursive {
 			fmt.Fprintf(os.Stderr, "removed %d file(s), %s\n", len(names), humanSize(size))
 		}
+	case "unlock":
+		want(0, 0)
+		if *ttl <= 0 {
+			fail("--for needs a positive duration, such as 5m or 1h")
+		}
+		pass, err := term.ReadPassphrase("Enter passphrase:", passphraseEnv)
+		check(err)
+		id, err := unlockKeyFile(*keyPath, pass)
+		check(err)
+		check(agentStart(*keyPath, id, *ttl))
+		id.Close()
+		fmt.Fprintf(os.Stderr, "unlocked until %s; vault lock forgets the key sooner\n",
+			time.Now().Add(*ttl).Format("15:04:05"))
+	case "lock":
+		want(0, 0)
+		if agentStop(*keyPath) {
+			fmt.Fprintln(os.Stderr, "locked")
+		} else {
+			fmt.Fprintln(os.Stderr, "nothing was unlocked")
+		}
 	case "help", "-h", "--help":
 		fmt.Println(usage)
 	default:
 		fail("unknown command %q\n\n%s", cmd, usage)
 	}
+}
+
+// transfers works out, like mv(1) and cp(1), which stored names src and dst
+// mean: each file to copy or move, paired with its new name. src is a file,
+// or with recursive a folder. dst ending in / or naming an existing folder
+// means into it. No new name may already exist.
+func transfers(cat map[string][]*record, src, dst string, recursive bool) ([][2]string, error) {
+	into := dst == "" || strings.HasSuffix(dst, "/")
+	src, dst = strings.Trim(src, "/"), strings.Trim(dst, "/")
+	if src == "" {
+		return nil, errors.New("name a file or folder to copy or move")
+	}
+	if dst == "" || len(cat[dst]) == 0 && len(under(cat, dst)) > 0 {
+		into = true
+	}
+	if into {
+		dst = path.Join(dst, path.Base(src))
+	}
+	var pairs [][2]string
+	if len(cat[src]) > 0 {
+		pairs = [][2]string{{src, dst}}
+	} else {
+		names := under(cat, src)
+		if len(names) == 0 {
+			return nil, fmt.Errorf("%s: not in the vault", src)
+		}
+		if !recursive {
+			return nil, fmt.Errorf("%s is a folder; use -r", src)
+		}
+		if dst == src || strings.HasPrefix(dst, src+"/") {
+			return nil, fmt.Errorf("cannot put %s inside itself", src)
+		}
+		for _, n := range names {
+			pairs = append(pairs, [2]string{n, dst + n[len(src):]})
+		}
+	}
+	for _, p := range pairs {
+		if !validName(p[1]) {
+			return nil, fmt.Errorf("invalid vault path %q", p[1])
+		}
+		if len(cat[p[1]]) > 0 {
+			return nil, fmt.Errorf("%s already exists", p[1])
+		}
+	}
+	return pairs, nil
 }
 
 // parseInterleaved lets flags appear before, between or after positional
@@ -294,9 +404,7 @@ func defaultPath(env, name string) string {
 // open unlocks the key and opens the vault, holding the vault lock
 // exclusively for writers and shared for readers.
 func open(keyPath, vaultDir string, exclusive bool) *store {
-	pass, err := term.ReadPassphrase("Enter passphrase:", passphraseEnv)
-	check(err)
-	id, err := unlockKeyFile(keyPath, pass)
+	id, err := keyIdentity(keyPath)
 	check(err)
 	s, err := openStore(vaultDir, id)
 	check(err)

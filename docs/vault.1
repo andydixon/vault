@@ -43,17 +43,29 @@ lists one folder, with sub-folders marked;
 lists every file under a folder.
 .TP
 .BR vault\-get (1)
-Decrypt a stored file.
+Decrypt a stored file, or a whole folder with
+.BR \-r .
 .TP
 .BR vault\-mv (1)
-Rename a stored file (alias:
+Rename or move a stored file or folder (alias:
 .BR rename ).
+.TP
+.BR vault\-cp (1)
+Copy a stored file, or a whole folder with
+.BR \-r .
 .TP
 .BR vault\-rm (1)
 Delete a stored file, or a whole folder with
 .B \-r
 (alias:
 .BR delete ).
+.TP
+.BR vault\-unlock (1)
+Remember the unlocked key for a while (default 5 minutes), so commands
+skip the passphrase.
+.TP
+.BR vault\-lock (1)
+Forget it now.
 .TP
 .B help
 Print usage.
@@ -74,7 +86,8 @@ Default key file.
 Default vault directory.
 .TP
 .B VAULT_PASSPHRASE
-Passphrase, instead of prompting on the terminal.
+Passphrase, instead of prompting on the terminal or using a key remembered by
+.BR vault\-unlock (1).
 .TP
 .B VAULT_DECOY_PASSPHRASE
 Decoy passphrase used by

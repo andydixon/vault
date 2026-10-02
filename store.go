@@ -586,23 +586,28 @@ func (s *store) removeAll(cat map[string][]*record, names []string, done func(na
 	return nil
 }
 
-func (s *store) rename(oldName, newName string) error {
-	if !validName(newName) {
-		return fmt.Errorf("invalid vault path %q", newName)
+// copyAll stores each pair's first name again under its second, sharing its
+// objects, then with move deletes the first names. New records go first, so
+// an interruption leaves a file under both names, never neither.
+func (s *store) copyAll(cat map[string][]*record, pairs [][2]string, move bool, done func(from, to string)) error {
+	var old []string
+	for _, p := range pairs {
+		r := *cat[p[0]][0]
+		r.Name = p[1]
+		if !move {
+			r.Added = time.Now().UTC()
+		}
+		if err := s.writeRecord(&r); err != nil {
+			return err
+		}
+		cat[p[1]] = []*record{&r}
+		old = append(old, p[0])
+		done(p[0], p[1])
 	}
-	cat, r, err := s.lookup(oldName)
-	if err != nil {
-		return err
+	if !move {
+		return nil
 	}
-	if len(cat[newName]) > 0 {
-		return fmt.Errorf("%s already exists", newName)
-	}
-	moved := *r
-	moved.Name = newName
-	if err := s.writeRecord(&moved); err != nil {
-		return err
-	}
-	return s.remove(cat, oldName, false)
+	return s.removeAll(cat, old, func(string) {})
 }
 
 // get decrypts name to out. Nothing appears at out until every object,
@@ -612,6 +617,10 @@ func (s *store) get(name, out string) error {
 	if err != nil {
 		return err
 	}
+	return s.getRecord(r, out)
+}
+
+func (s *store) getRecord(r *record, out string) error {
 	if _, err := os.Lstat(out); err == nil {
 		return fmt.Errorf("%s already exists", out)
 	}

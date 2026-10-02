@@ -1,6 +1,6 @@
 .TH VAULT-MV 1 "September 2026" "vault" "User Commands"
 .SH NAME
-vault-mv \- rename a stored file
+vault-mv \- rename or move a stored file or folder
 .SH SYNOPSIS
 .B vault mv
 .RB [ \-\-key
@@ -12,9 +12,12 @@ vault-mv \- rename a stored file
 .B vault rename
 \&...
 .SH DESCRIPTION
-Renames \fIOLD\fR to \fINEW\fR, which may be in another folder. Fails if
-\fINEW\fR exists or is not a valid vault path. File contents are not
-re-encrypted.
+Renames \fIOLD\fR, a file or a folder and everything under it, to
+\fINEW\fR. If \fINEW\fR ends in / or names an existing folder, \fIOLD\fR
+moves into it, keeping its base name, as with
+.BR mv (1).
+Fails, changing nothing, if any new name exists or is not a valid vault
+path. File contents are not re-encrypted.
 .SH OPTIONS
 .TP
 .BI \-\-key " PATH"
@@ -28,6 +31,7 @@ Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
 Passphrase, instead of prompting on the terminal.
 .SH SEE ALSO
 .BR vault (1),
+.BR vault\-cp (1),
 .BR vault\-rm (1)
 .SH AUTHOR
 Andy Dixon <vault@dixon.cx>, https://www.dixon.cx
