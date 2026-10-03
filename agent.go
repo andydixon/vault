@@ -26,7 +26,8 @@ import (
 // seed over a pipe; it never touches the disk. The agent serves them on a
 // Unix socket in a directory only this user can enter, keeps them in locked,
 // undumpable memory where the platform allows, and wipes them and exits at
-// a fixed deadline, or on `vault lock`. Using the agent never extends it.
+// a deadline, or on `vault lock`. The deadline is fixed, or with --idle it
+// moves on each time a command uses the key.
 
 const (
 	agentCmd     = "__agent" // hidden: the agent process itself
@@ -104,8 +105,8 @@ func agentStop(keyPath string) bool {
 }
 
 // agentStart replaces any agent for keyPath with one holding id until ttl
-// has passed.
-func agentStart(keyPath string, id *pqcrypt.PQIdentity, ttl time.Duration) error {
+// has passed, since it started or, with idle, since the key was last used.
+func agentStart(keyPath string, id *pqcrypt.PQIdentity, ttl time.Duration, idle bool) error {
 	sock, err := agentSocket(keyPath)
 	if err != nil {
 		return err
@@ -115,7 +116,11 @@ func agentStart(keyPath string, id *pqcrypt.PQIdentity, ttl time.Duration) error
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(self, agentCmd, sock, ttl.String())
+	mode := "fixed"
+	if idle {
+		mode = "idle"
+	}
+	cmd := exec.Command(self, agentCmd, sock, ttl.String(), mode)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -150,12 +155,13 @@ func agentStart(keyPath string, id *pqcrypt.PQIdentity, ttl time.Duration) error
 
 // runAgent is the agent process: it reads the key from in, says "ok" or
 // why not on out and closes it, then serves the key on sock until ttl has
-// passed or it is told to quit.
-func runAgent(sock, ttlArg string, in io.Reader, out io.WriteCloser) {
+// passed, since it started or with mode "idle" since the key was last
+// handed out, or until it is told to quit.
+func runAgent(sock, ttlArg, mode string, in io.Reader, out io.WriteCloser) {
 	report := func(msg string) { io.WriteString(out, msg); out.Close() }
 	ttl, err := time.ParseDuration(ttlArg)
-	if err != nil || ttl <= 0 {
-		report("bad duration")
+	if err != nil || ttl <= 0 || mode != "fixed" && mode != "idle" {
+		report("bad duration or mode")
 		return
 	}
 	secret := make([]byte, agentReply)
@@ -175,44 +181,40 @@ func runAgent(sock, ttlArg string, in io.Reader, out io.WriteCloser) {
 	}
 	os.Chmod(sock, 0o600)
 	report("ok")
-	done := make(chan struct{})
-	time.AfterFunc(ttl, func() { l.Close() })
-	go func() {
-		defer close(done)
-		for {
-			c, err := l.Accept()
-			if err != nil {
-				return
-			}
-			if !serveAgent(c, secret) {
-				l.Close()
-				c.Close()
-				return
-			}
-			c.Close()
+	expiry := time.AfterFunc(ttl, func() { l.Close() })
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			break
 		}
-	}()
-	<-done
+		op := serveAgent(c, secret)
+		c.Close()
+		if op == agentQuit {
+			break
+		}
+		if op == agentGet && mode == "idle" {
+			expiry.Reset(ttl)
+		}
+	}
+	l.Close()
 	clear(secret)
 	os.Remove(sock)
 }
 
-// serveAgent answers one request, reporting whether to keep going.
-func serveAgent(c net.Conn, secret []byte) bool {
+// serveAgent answers one request and returns its operation.
+func serveAgent(c net.Conn, secret []byte) byte {
 	c.SetDeadline(time.Now().Add(agentTimeout))
 	op := make([]byte, 1)
 	if _, err := io.ReadFull(c, op); err != nil {
-		return true
+		return 0
 	}
 	switch op[0] {
 	case agentGet:
 		c.Write(secret)
-		return true
 	case agentQuit:
 		clear(secret)
-		return false
 	}
-	return true
+	return op[0]
 }
 
 // keyIdentity unlocks the key at keyPath: from the agent if one is running

@@ -15,8 +15,9 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
   folder, asks unless `-f`), `unlock`/`lock`.
 - `agent*.go` - `vault unlock` re-executes itself as a hidden `__agent`
   process holding the suite ID and seed (pipe in, mlocked, undumpable) and
-  serving them on a Unix socket in a 0700 per-user dir until a hard
-  deadline. `keyIdentity` asks it first unless `$VAULT_PASSPHRASE` is set.
+  serving them on a Unix socket in a 0700 per-user dir until a deadline
+  (fixed, or with `--idle` reset on each use). `keyIdentity` asks it first
+  unless `$VAULT_PASSPHRASE` is set.
 - `keyfile.go` - key file with two passphrase slots (Argon2id +
   XChaCha20-Poly1305 sealing a suite ID and 32-byte master seed). The second
   slot is either a decoy identity or random bytes; slot order is random.
@@ -30,6 +31,9 @@ root that builds a single `vault` binary. Module `github.com/andydixon/vault`.
   readers shared, taken after the passphrase prompt.
 - `docs/guide` - LaTeX user guide (`build-pdf.sh` via Tectonic; `shots.py`
   re-shoots screenshots from the real binary). Keep it in step with the CLI.
+- `packaging/repo.sh [TAG]` - builds dixon-vault .deb/.rpm/Arch packages
+  from a tag with nfpm and publishes them, signed, to the apt/dnf/pacman
+  repo at repo.dixon.cx (same script, other project block, in ../mapsize).
 - `build.sh` - cross-compiles every `go tool dist list` target except
   iOS and android/386, amd64, arm (cgo-only).
 - `internal/pqcrypt` - file encryption (header + STREAM ChaCha20-Poly1305),

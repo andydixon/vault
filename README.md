@@ -11,6 +11,16 @@ whatever the file's size. Object names derive from a secret seed in the
 record, so nothing on disk links a file's pieces. Records and objects are
 spread over 256 subfolders (`records/3f/3fa9…`) to keep directories small.
 
+## Install
+
+On Debian, Ubuntu, Fedora, RHEL, openSUSE and Arch, install the
+`dixon-vault` package from the signed repository at repo.dixon.cx; see
+https://dixon.cx/repo for the two or three commands. (The package isn't
+called `vault` because that name is HashiCorp Vault's.) Every platform also
+has a single binary at https://download.dixon.cx/vault/.
+
+Releases are packaged and published with `packaging/repo.sh [TAG]`.
+
 ## Build
 
 ```sh
@@ -65,6 +75,7 @@ vault rm old/report.pdf
 vault rm -r old                  # a whole folder; lists it and asks first
 vault rm -rf old                 # the same, without asking
 vault unlock                     # remember the key for 5 minutes (--for 30m)
+vault unlock --idle              # ... or until 5 minutes go by unused
 vault lock                       # forget it now
 ```
 
@@ -85,7 +96,8 @@ scripts.
 
 `vault unlock` asks once, then starts a helper process, like `ssh-agent`,
 that holds the unlocked key in memory until a hard deadline (5 minutes by
-default) or `vault lock`. Until then commands skip the prompt, unless
+default; with `--idle`, 5 minutes since a command last used it) or
+`vault lock`. Until then commands skip the prompt, unless
 `$VAULT_PASSPHRASE` is set, which always wins. The key reaches the helper
 over a pipe and never touches the disk; the helper's memory is locked
 against swapping, it cannot be core-dumped (or, on Linux, debugged), and it

@@ -5,6 +5,7 @@ vault-unlock, vault-lock \- remember the unlocked key for a while, or forget it
 .B vault unlock
 .RB [ \-\-for
 .IR DURATION ]
+.RB [ \-\-idle ]
 .RB [ \-\-key
 .IR PATH ]
 .br
@@ -17,8 +18,9 @@ asks for the passphrase, checks it, and starts a helper process, much like
 .BR ssh\-agent (1),
 that holds the unlocked key in memory until \fIDURATION\fR has passed
 (default 5m). Until then every command using the same key file skips the
-passphrase prompt. The deadline is fixed when you unlock; using the key does
-not extend it. Running
+passphrase prompt. By default the deadline is fixed when you unlock and
+using the key does not extend it; with \fB\-\-idle\fR it is \fIDURATION\fR
+after the last command that used the key. Running
 .B unlock
 again replaces the helper with a fresh one.
 .PP
@@ -38,6 +40,10 @@ handing the machine to anyone.
 .TP
 .BI \-\-for " DURATION"
 How long to remember the key, such as 90s, 5m or 2h. Default 5m.
+.TP
+.B \-\-idle
+Count \fIDURATION\fR from the last time a command used the key, rather than
+from the unlock, so the key stays while you keep working.
 .PP
 See also \fB\-\-key\fR in
 .BR vault (1).

@@ -186,6 +186,26 @@ Download the one file for your system, check its SHA-256, rename it to
 Or build every platform yourself with \cmd{./build.sh}.
 \end{tldr}
 
+\section{The easy way on Linux: my package repository}
+
+On Debian, Ubuntu, Fedora, RHEL, openSUSE or Arch, add my signed repository
+once and install the \cmd{dixon-vault} package with your usual package
+manager. You get the manual pages too, and new releases arrive with your
+normal system updates. On Debian or Ubuntu:
+
+\begin{shell}
+$ sudo install -d -m 0755 /etc/apt/keyrings
+$ curl -fsSL https://repo.dixon.cx/dixon.gpg | sudo tee /etc/apt/keyrings/dixon.gpg >/dev/null
+$ echo "deb [signed-by=/etc/apt/keyrings/dixon.gpg] https://repo.dixon.cx/apt stable main" |
+    sudo tee /etc/apt/sources.list.d/dixon.list
+$ sudo apt update && sudo apt install dixon-vault
+\end{shell}
+
+The commands for dnf, zypper and pacman are at \file{dixon.cx/repo}. The
+package is called \cmd{dixon-vault} because plain \cmd{vault} is HashiCorp
+Vault's name; the command it installs is still \cmd{vault}. Everyone else,
+read on.
+
 \section{Pick your file}
 
 vault is a single self-contained program. No installer, no runtime, no
@@ -714,13 +734,16 @@ vault.
 \begin{shell}
 $ vault unlock             # ask once, remember the key for 5 minutes
 $ vault unlock --for 30m   # or for as long as you say
+$ vault unlock --idle      # 5 minutes since you last used it
 $ vault lock               # forget it right now
 \end{shell}
 
 After \cmd{unlock}, every command skips the passphrase prompt until the time
-is up. It's a hard deadline, counted from when you unlocked, not from when you
-last used it, so a laptop left open still locks itself. Run \cmd{unlock}
-again to start a fresh countdown.
+is up. Normally that's a hard deadline, counted from when you unlocked, so a
+laptop left open still locks itself; run \cmd{unlock} again for a fresh
+countdown. If you'd rather it stayed unlocked while you're busy, \cmd{--idle}
+counts from the last command that used the key instead, so it locks only
+after that long without use.
 
 \shot{unlock}{Unlock once, work without prompts, lock when you're done}
 
@@ -1362,7 +1385,7 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault mv OLD NEW}\\[2pt]\small Rename or move a file or folder. Instant.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault cp [-r] OLD NEW}\\[2pt]\small Copy a file, or a folder with -r. Instant, no extra space.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault rm [-r] [-f] NAME}\\[2pt]\small Delete a file, or a folder with -r. Frees the space. No undo.\end{tcolorbox}
-\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault unlock [--for 5m]}\\[2pt]\small Remember the key, so commands stop asking. Hard deadline.\end{tcolorbox}
+\begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault unlock [--for 5m] [--idle]}\\[2pt]\small Remember the key, so commands stop asking. Fixed deadline, or since last use.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault lock}\\[2pt]\small Forget the remembered key now.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries vault help}\\[2pt]\small Show the command summary.\end{tcolorbox}
 \begin{tcolorbox}{\ttfamily\color{vtealdeep}\bfseries man vault}\\[2pt]\small A manual page for vault and for every command.\end{tcolorbox}
@@ -1380,6 +1403,7 @@ passphrase. Nothing in this chapter helps with that. Back up your key.
 --yes & \textrm{---} & ask, for \cmd{migrate} \\
 -r & \textrm{---} & \cmd{rm}, \cmd{get}, \cmd{cp}: one file; \cmd{ls}: one level \\
 --for DURATION & \textrm{---} & \cmd{5m}, for \cmd{unlock} \\
+--idle & \textrm{---} & \cmd{unlock}: count from the unlock, not the last use \\
 -f & \textrm{---} & \cmd{rm}: ask before \cmd{-r}, fail if missing \\
 \end{vtable}
 

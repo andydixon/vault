@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/andydixon/vault/internal/pqcrypt"
 )
 
 func TestKeyFile(t *testing.T) {
@@ -668,7 +670,7 @@ func TestAgent(t *testing.T) {
 	secret = append(secret, id.Seed()...)
 	pr, pw := io.Pipe()
 	stopped := make(chan struct{})
-	go func() { runAgent(sock, "1m", bytes.NewReader(secret), pw); close(stopped) }()
+	go func() { runAgent(sock, "1m", "fixed", bytes.NewReader(secret), pw); close(stopped) }()
 	if msg, _ := io.ReadAll(pr); string(msg) != "ok" {
 		t.Fatalf("agent said %q", msg)
 	}
@@ -688,5 +690,39 @@ func TestAgent(t *testing.T) {
 	}
 	if agentStop(keyPath) {
 		t.Fatal("agent still running")
+	}
+}
+
+func TestAgentIdle(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	keyPath := filepath.Join(dir, "key")
+	sock, err := agentSocket(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := pqcrypt.GeneratePQIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := binary.BigEndian.AppendUint16(nil, id.SuiteID())
+	secret = append(secret, id.Seed()...)
+	pr, pw := io.Pipe()
+	stopped := make(chan struct{})
+	go func() { runAgent(sock, "400ms", "idle", bytes.NewReader(secret), pw); close(stopped) }()
+	if msg, _ := io.ReadAll(pr); string(msg) != "ok" {
+		t.Fatalf("agent said %q", msg)
+	}
+	// Used every 150ms, it outlives its 400ms by well over twice.
+	for range 7 {
+		time.Sleep(150 * time.Millisecond)
+		if _, err := agentIdentity(keyPath); err != nil {
+			t.Fatal("idle agent expired while in use: ", err)
+		}
+	}
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("idle agent outlived its idle time")
 	}
 }

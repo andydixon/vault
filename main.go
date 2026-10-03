@@ -57,7 +57,8 @@ const usage = `Usage:
     vault rm -r FOLDER [-f]         delete a folder and everything under it;
                                     asks first unless -f (or -rf) is given
     vault unlock [--for DURATION]   remember the passphrase for DURATION
-                                    (default 5m), so commands skip asking
+    [--idle]                        (default 5m), so commands skip asking;
+                                    with --idle, DURATION since last used
     vault lock                      forget it now
 
 Options (any command):
@@ -91,8 +92,8 @@ func main() {
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
-	if cmd == agentCmd && len(args) == 2 {
-		runAgent(args[0], args[1], os.Stdin, os.Stdout)
+	if cmd == agentCmd && len(args) == 3 {
+		runAgent(args[0], args[1], args[2], os.Stdin, os.Stdout)
 		return
 	}
 	fset := flag.NewFlagSet("vault "+cmd, flag.ContinueOnError)
@@ -103,6 +104,7 @@ func main() {
 	filler := fset.String("filler", "0", "")
 	yes := fset.Bool("yes", false, "")
 	ttl := fset.Duration("for", 5*time.Minute, "")
+	idle := fset.Bool("idle", false, "")
 	// rm's -r and -f; Go's flag package has no combined short flags, so
 	// -rf and -fr are spelled out.
 	recurse, force := fset.Bool("r", false, ""), fset.Bool("f", false, "")
@@ -295,10 +297,14 @@ func main() {
 		check(err)
 		id, err := unlockKeyFile(*keyPath, pass)
 		check(err)
-		check(agentStart(*keyPath, id, *ttl))
+		check(agentStart(*keyPath, id, *ttl, *idle))
 		id.Close()
-		fmt.Fprintf(os.Stderr, "unlocked until %s; vault lock forgets the key sooner\n",
-			time.Now().Add(*ttl).Format("15:04:05"))
+		if *idle {
+			fmt.Fprintf(os.Stderr, "unlocked until unused for %s; vault lock forgets the key sooner\n", *ttl)
+		} else {
+			fmt.Fprintf(os.Stderr, "unlocked until %s; vault lock forgets the key sooner\n",
+				time.Now().Add(*ttl).Format("15:04:05"))
+		}
 	case "lock":
 		want(0, 0)
 		if agentStop(*keyPath) {
