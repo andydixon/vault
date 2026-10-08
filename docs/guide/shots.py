@@ -7,7 +7,9 @@ sandbox path and file owner are shown as /home/sam and "sam sam", key lines
 are highlighted in amber for the reader, and "moment" frames show a prompt
 with a cursor, exactly as vault prints it before you type.
 
-Needs: go, python3, and Chrome or Chromium (set CHROME=/path if not found).
+Needs: cargo (with the pinned toolchain), cargo-zigbuild and zig for the
+build screenshot, python3, and Chrome or Chromium (set CHROME=/path if not
+found).
 Output: docs/guide/img/*.png
 """
 
@@ -75,7 +77,8 @@ class Sandbox:
         self.bin = os.path.join(self.root, "bin")
         os.makedirs(self.home)
         os.makedirs(self.bin)
-        subprocess.run(["go", "build", "-o", os.path.join(self.bin, "vault"), "."], cwd=REPO, check=True)
+        subprocess.run(["cargo", "build", "--release", "--locked", "--quiet"], cwd=REPO, check=True)
+        shutil.copy2(os.path.join(REPO, "target", "release", "vault"), os.path.join(self.bin, "vault"))
 
     def env(self, extra=None):
         e = {
@@ -406,7 +409,7 @@ def main():
 
     # building, into a temporary OUT so an existing dist/ is left alone
     rel = tempfile.mkdtemp(prefix="vault-release-")
-    targets = "linux/amd64 linux/arm darwin/arm64 windows/amd64"
+    targets = "linux/amd64 linux/arm64 linux/armv7 windows/amd64"
     t = Term(box, title="sam@laptop: ~/src/vault")
     out = subprocess.run(["./build.sh"], cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          text=True, env=dict(os.environ, TARGETS=targets, OUT=rel)).stdout

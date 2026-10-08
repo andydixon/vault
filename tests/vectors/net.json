@@ -1,0 +1,3180 @@
+{
+ "http_time": {
+  "Mon Jan  2 15:04:05 2006": 1136214245,
+  "Mon Jan 12 15:04:05 2006": 1137078245,
+  "Mon, 02 Jan 2006 15:04:05 GMT": 1136214245,
+  "Mon, 02 Jan 2006 15:04:05 UTC": null,
+  "Monday, 02-Jan-06 15:04:05 GMT": 1136214245,
+  "Tue, 15 Nov 1994 08:12:31 GMT": 784887151,
+  "bogus": null
+ },
+ "parse": [
+  {
+   "input": "",
+   "err": false,
+   "local_path": "index.html"
+  },
+  {
+   "input": "a",
+   "err": false,
+   "string": "a",
+   "path": "a",
+   "local_path": "a",
+   "key": "a"
+  },
+  {
+   "input": "a/b",
+   "err": false,
+   "string": "a/b",
+   "path": "a/b",
+   "local_path": "a/b",
+   "key": "a/b"
+  },
+  {
+   "input": "./a",
+   "err": false,
+   "string": "./a",
+   "path": "./a",
+   "local_path": "./a",
+   "key": "./a"
+  },
+  {
+   "input": "../a",
+   "err": false,
+   "string": "../a",
+   "path": "../a",
+   "local_path": "../a",
+   "key": "../a"
+  },
+  {
+   "input": "../../../../a",
+   "err": false,
+   "string": "../../../../a",
+   "path": "../../../../a",
+   "local_path": "../../../../a",
+   "key": "../../../../a"
+  },
+  {
+   "input": "/a/./b/../c",
+   "err": false,
+   "string": "/a/./b/../c",
+   "path": "/a/./b/../c",
+   "local_path": "a/./b/../c",
+   "key": "/a/./b/../c"
+  },
+  {
+   "input": "/",
+   "err": false,
+   "string": "/",
+   "path": "/",
+   "local_path": "index.html",
+   "key": "/"
+  },
+  {
+   "input": "//other.example/x",
+   "err": false,
+   "string": "//other.example/x",
+   "host": "other.example",
+   "hostname": "other.example",
+   "path": "/x",
+   "local_path": "x",
+   "key": "//other.example/x"
+  },
+  {
+   "input": "//OTHER.example:8080",
+   "err": false,
+   "string": "//OTHER.example:8080",
+   "host": "OTHER.example:8080",
+   "hostname": "OTHER.example",
+   "local_path": "index.html",
+   "key": "//OTHER.example:8080"
+  },
+  {
+   "input": "?q=1",
+   "err": false,
+   "string": "?q=1",
+   "raw_query": "q=1",
+   "local_path": "index.html_q%3D1",
+   "key": "?q=1"
+  },
+  {
+   "input": "?",
+   "err": false,
+   "string": "?",
+   "local_path": "index.html",
+   "key": "?"
+  },
+  {
+   "input": "#frag",
+   "err": false,
+   "string": "#frag",
+   "fragment": "frag",
+   "local_path": "index.html"
+  },
+  {
+   "input": "a#f",
+   "err": false,
+   "string": "a#f",
+   "path": "a",
+   "fragment": "f",
+   "local_path": "a",
+   "key": "a"
+  },
+  {
+   "input": "a?x=1\u0026y=2#f",
+   "err": false,
+   "string": "a?x=1\u0026y=2#f",
+   "path": "a",
+   "raw_query": "x=1\u0026y=2",
+   "fragment": "f",
+   "local_path": "a_x%3D1%26y%3D2",
+   "key": "a?x=1\u0026y=2"
+  },
+  {
+   "input": "/sp ace",
+   "err": false,
+   "string": "/sp%20ace",
+   "path": "/sp ace",
+   "local_path": "sp ace",
+   "key": "/sp%20ace"
+  },
+  {
+   "input": "/%41%2fb",
+   "err": false,
+   "string": "/%41%2fb",
+   "path": "/A/b",
+   "local_path": "A/b",
+   "key": "/%41%2fb"
+  },
+  {
+   "input": "/%zz",
+   "err": true
+  },
+  {
+   "input": "/caf%C3%A9",
+   "err": false,
+   "string": "/caf%C3%A9",
+   "path": "/café",
+   "local_path": "café",
+   "key": "/caf%C3%A9"
+  },
+  {
+   "input": "/café",
+   "err": false,
+   "string": "/caf%C3%A9",
+   "path": "/café",
+   "local_path": "café",
+   "key": "/caf%C3%A9"
+  },
+  {
+   "input": "http://H.Example:80/A",
+   "err": false,
+   "string": "http://H.Example:80/A",
+   "scheme": "http",
+   "host": "H.Example:80",
+   "hostname": "H.Example",
+   "path": "/A",
+   "local_path": "A",
+   "key": "http://H.Example:80/A"
+  },
+  {
+   "input": "https://x/a/b/../../..",
+   "err": false,
+   "string": "https://x/a/b/../../..",
+   "scheme": "https",
+   "host": "x",
+   "hostname": "x",
+   "path": "/a/b/../../..",
+   "local_path": "a/b/../../..",
+   "key": "https://x/a/b/../../.."
+  },
+  {
+   "input": "HTTP://x",
+   "err": false,
+   "string": "http://x",
+   "scheme": "http",
+   "host": "x",
+   "hostname": "x",
+   "local_path": "index.html",
+   "key": "http://x"
+  },
+  {
+   "input": "mailto:a@b",
+   "err": false,
+   "string": "mailto:a@b",
+   "scheme": "mailto",
+   "local_path": "index.html",
+   "key": "mailto:a@b"
+  },
+  {
+   "input": "javascript:alert(1)",
+   "err": false,
+   "string": "javascript:alert(1)",
+   "scheme": "javascript",
+   "local_path": "index.html",
+   "key": "javascript:alert(1)"
+  },
+  {
+   "input": "ftp://x/y",
+   "err": false,
+   "string": "ftp://x/y",
+   "scheme": "ftp",
+   "host": "x",
+   "hostname": "x",
+   "path": "/y",
+   "local_path": "y",
+   "key": "ftp://x/y"
+  },
+  {
+   "input": "x:y",
+   "err": false,
+   "string": "x:y",
+   "scheme": "x",
+   "local_path": "index.html",
+   "key": "x:y"
+  },
+  {
+   "input": "a:b/c",
+   "err": false,
+   "string": "a:b/c",
+   "scheme": "a",
+   "local_path": "index.html",
+   "key": "a:b/c"
+  },
+  {
+   "input": "/a?b?c",
+   "err": false,
+   "string": "/a?b?c",
+   "path": "/a",
+   "raw_query": "b?c",
+   "local_path": "a_b%3Fc",
+   "key": "/a?b?c"
+  },
+  {
+   "input": "a/..",
+   "err": false,
+   "string": "a/..",
+   "path": "a/..",
+   "local_path": "a/..",
+   "key": "a/.."
+  },
+  {
+   "input": "a/.",
+   "err": false,
+   "string": "a/.",
+   "path": "a/.",
+   "local_path": "a/.",
+   "key": "a/."
+  },
+  {
+   "input": ".",
+   "err": false,
+   "string": ".",
+   "path": ".",
+   "local_path": ".",
+   "key": "."
+  },
+  {
+   "input": "..",
+   "err": false,
+   "string": "..",
+   "path": "..",
+   "local_path": "..",
+   "key": ".."
+  },
+  {
+   "input": "/a//b",
+   "err": false,
+   "string": "/a//b",
+   "path": "/a//b",
+   "local_path": "a//b",
+   "key": "/a//b"
+  },
+  {
+   "input": "https://user:pw@x/p",
+   "err": false,
+   "string": "https://user:pw@x/p",
+   "scheme": "https",
+   "host": "x",
+   "hostname": "x",
+   "path": "/p",
+   "local_path": "p",
+   "key": "https://user:pw@x/p"
+  },
+  {
+   "input": "http://[::1]:8080/v6",
+   "err": false,
+   "string": "http://[::1]:8080/v6",
+   "scheme": "http",
+   "host": "[::1]:8080",
+   "hostname": "::1",
+   "path": "/v6",
+   "local_path": "v6",
+   "key": "http://[::1]:8080/v6"
+  },
+  {
+   "input": "http://x:port/",
+   "err": true
+  },
+  {
+   "input": "http://x:/p",
+   "err": false,
+   "string": "http://x:/p",
+   "scheme": "http",
+   "host": "x:",
+   "hostname": "x",
+   "path": "/p",
+   "local_path": "p",
+   "key": "http://x:/p"
+  },
+  {
+   "input": "/a%20b?c%20d#e%20f",
+   "err": false,
+   "string": "/a%20b?c%20d#e%20f",
+   "path": "/a b",
+   "raw_query": "c%20d",
+   "fragment": "e f",
+   "local_path": "a b_c%2520d",
+   "key": "/a%20b?c%20d"
+  },
+  {
+   "input": "http://x/\u0001",
+   "err": true
+  },
+  {
+   "input": "/a+b",
+   "err": false,
+   "string": "/a+b",
+   "path": "/a+b",
+   "local_path": "a+b",
+   "key": "/a+b"
+  },
+  {
+   "input": "/q?a+b=c d",
+   "err": false,
+   "string": "/q?a+b=c d",
+   "path": "/q",
+   "raw_query": "a+b=c d",
+   "local_path": "q_a%2Bb%3Dc+d",
+   "key": "/q?a+b=c d"
+  },
+  {
+   "input": "#",
+   "err": false,
+   "local_path": "index.html"
+  },
+  {
+   "input": "?#",
+   "err": false,
+   "string": "?",
+   "local_path": "index.html",
+   "key": "?"
+  },
+  {
+   "input": "/p#a%23b",
+   "err": false,
+   "string": "/p#a%23b",
+   "path": "/p",
+   "fragment": "a#b",
+   "local_path": "p",
+   "key": "/p"
+  },
+  {
+   "input": "//x/?",
+   "err": false,
+   "string": "//x/?",
+   "host": "x",
+   "hostname": "x",
+   "path": "/",
+   "local_path": "index.html",
+   "key": "//x/?"
+  },
+  {
+   "input": "http://x?only",
+   "err": false,
+   "string": "http://x?only",
+   "scheme": "http",
+   "host": "x",
+   "hostname": "x",
+   "raw_query": "only",
+   "local_path": "index.html_only",
+   "key": "http://x?only"
+  }
+ ],
+ "provenance": "oracle/go at 4c1507c, net_oracle_vectors_test.go",
+ "query_escape": {
+  "a+b": "a%2Bb",
+  "a=1\u0026b=2": "a%3D1%26b%3D2",
+  "x y": "x+y",
+  "~-_.!*'()": "~-_.%21%2A%27%28%29",
+  "é/?#": "%C3%A9%2F%3F%23"
+ },
+ "relative": [
+  [
+   "index.html",
+   "sub/p.html",
+   "sub/p.html"
+  ],
+  [
+   "sub/p.html",
+   "index.html",
+   "../index.html"
+  ],
+  [
+   "sub/p.html",
+   "img/a.png",
+   "../img/a.png"
+  ],
+  [
+   "a/b/c.html",
+   "a/b/d.html",
+   "d.html"
+  ],
+  [
+   "a/b/c.html",
+   "a/x/y/z.css",
+   "../x/y/z.css"
+  ],
+  [
+   "x.html",
+   "x.html",
+   "x.html"
+  ],
+  [
+   "a/b/",
+   "a/c",
+   "../c"
+  ],
+  [
+   "s.css",
+   "img/a.png",
+   "img/a.png"
+  ],
+  [
+   "a/b/c",
+   "a",
+   "../../a"
+  ]
+ ],
+ "resolve": [
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "",
+   "result": {
+    "input": "",
+    "err": false,
+    "string": "http://h.example/dir/page.html?q=1#top",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "raw_query": "q=1",
+    "fragment": "top",
+    "local_path": "dir/page.html_q%3D1",
+    "key": "http://h.example/dir/page.html?q=1"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a",
+   "result": {
+    "input": "a",
+    "err": false,
+    "string": "http://h.example/dir/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a",
+    "local_path": "dir/a",
+    "key": "http://h.example/dir/a"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a/b",
+   "result": {
+    "input": "a/b",
+    "err": false,
+    "string": "http://h.example/dir/a/b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a/b",
+    "local_path": "dir/a/b",
+    "key": "http://h.example/dir/a/b"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "./a",
+   "result": {
+    "input": "./a",
+    "err": false,
+    "string": "http://h.example/dir/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a",
+    "local_path": "dir/a",
+    "key": "http://h.example/dir/a"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "../a",
+   "result": {
+    "input": "../a",
+    "err": false,
+    "string": "http://h.example/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "http://h.example/a"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "../../../../a",
+   "result": {
+    "input": "../../../../a",
+    "err": false,
+    "string": "http://h.example/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "http://h.example/a"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/a/./b/../c",
+   "result": {
+    "input": "/a/./b/../c",
+    "err": false,
+    "string": "http://h.example/a/c",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/c",
+    "local_path": "a/c",
+    "key": "http://h.example/a/c"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/",
+   "result": {
+    "input": "/",
+    "err": false,
+    "string": "http://h.example/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://h.example/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "//other.example/x",
+   "result": {
+    "input": "//other.example/x",
+    "err": false,
+    "string": "http://other.example/x",
+    "scheme": "http",
+    "host": "other.example",
+    "hostname": "other.example",
+    "path": "/x",
+    "local_path": "x",
+    "key": "http://other.example/x"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "//OTHER.example:8080",
+   "result": {
+    "input": "//OTHER.example:8080",
+    "err": false,
+    "string": "http://OTHER.example:8080",
+    "scheme": "http",
+    "host": "OTHER.example:8080",
+    "hostname": "OTHER.example",
+    "local_path": "index.html",
+    "key": "http://OTHER.example:8080"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "?q=1",
+   "result": {
+    "input": "?q=1",
+    "err": false,
+    "string": "http://h.example/dir/page.html?q=1",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "raw_query": "q=1",
+    "local_path": "dir/page.html_q%3D1",
+    "key": "http://h.example/dir/page.html?q=1"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "?",
+   "result": {
+    "input": "?",
+    "err": false,
+    "string": "http://h.example/dir/page.html?",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "local_path": "dir/page.html",
+    "key": "http://h.example/dir/page.html?"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "#frag",
+   "result": {
+    "input": "#frag",
+    "err": false,
+    "string": "http://h.example/dir/page.html?q=1#frag",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "raw_query": "q=1",
+    "fragment": "frag",
+    "local_path": "dir/page.html_q%3D1",
+    "key": "http://h.example/dir/page.html?q=1"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a#f",
+   "result": {
+    "input": "a#f",
+    "err": false,
+    "string": "http://h.example/dir/a#f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a",
+    "fragment": "f",
+    "local_path": "dir/a",
+    "key": "http://h.example/dir/a"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a?x=1\u0026y=2#f",
+   "result": {
+    "input": "a?x=1\u0026y=2#f",
+    "err": false,
+    "string": "http://h.example/dir/a?x=1\u0026y=2#f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a",
+    "raw_query": "x=1\u0026y=2",
+    "fragment": "f",
+    "local_path": "dir/a_x%3D1%26y%3D2",
+    "key": "http://h.example/dir/a?x=1\u0026y=2"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/sp ace",
+   "result": {
+    "input": "/sp ace",
+    "err": false,
+    "string": "http://h.example/sp%20ace",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/sp ace",
+    "local_path": "sp ace",
+    "key": "http://h.example/sp%20ace"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/%41%2fb",
+   "result": {
+    "input": "/%41%2fb",
+    "err": false,
+    "string": "http://h.example/%41%2fb",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/A/b",
+    "local_path": "A/b",
+    "key": "http://h.example/%41%2fb"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/%zz",
+   "result": {
+    "input": "/%zz",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/caf%C3%A9",
+   "result": {
+    "input": "/caf%C3%A9",
+    "err": false,
+    "string": "http://h.example/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/café",
+   "result": {
+    "input": "/café",
+    "err": false,
+    "string": "http://h.example/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://H.Example:80/A",
+   "result": {
+    "input": "http://H.Example:80/A",
+    "err": false,
+    "string": "http://H.Example:80/A",
+    "scheme": "http",
+    "host": "H.Example:80",
+    "hostname": "H.Example",
+    "path": "/A",
+    "local_path": "A",
+    "key": "http://H.Example:80/A"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "https://x/a/b/../../..",
+   "result": {
+    "input": "https://x/a/b/../../..",
+    "err": false,
+    "string": "https://x/",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://x/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "HTTP://x",
+   "result": {
+    "input": "HTTP://x",
+    "err": false,
+    "string": "http://x",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "local_path": "index.html",
+    "key": "http://x"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "mailto:a@b",
+   "result": {
+    "input": "mailto:a@b",
+    "err": false,
+    "string": "mailto:a@b",
+    "scheme": "mailto",
+    "local_path": "index.html",
+    "key": "mailto:a@b"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "javascript:alert(1)",
+   "result": {
+    "input": "javascript:alert(1)",
+    "err": false,
+    "string": "javascript:alert(1)",
+    "scheme": "javascript",
+    "local_path": "index.html",
+    "key": "javascript:alert(1)"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "ftp://x/y",
+   "result": {
+    "input": "ftp://x/y",
+    "err": false,
+    "string": "ftp://x/y",
+    "scheme": "ftp",
+    "host": "x",
+    "hostname": "x",
+    "path": "/y",
+    "local_path": "y",
+    "key": "ftp://x/y"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "x:y",
+   "result": {
+    "input": "x:y",
+    "err": false,
+    "string": "x:y",
+    "scheme": "x",
+    "local_path": "index.html",
+    "key": "x:y"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a:b/c",
+   "result": {
+    "input": "a:b/c",
+    "err": false,
+    "string": "a:b/c",
+    "scheme": "a",
+    "local_path": "index.html",
+    "key": "a:b/c"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/a?b?c",
+   "result": {
+    "input": "/a?b?c",
+    "err": false,
+    "string": "http://h.example/a?b?c",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "raw_query": "b?c",
+    "local_path": "a_b%3Fc",
+    "key": "http://h.example/a?b?c"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a/..",
+   "result": {
+    "input": "a/..",
+    "err": false,
+    "string": "http://h.example/dir/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/",
+    "local_path": "dir/index.html",
+    "key": "http://h.example/dir/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "a/.",
+   "result": {
+    "input": "a/.",
+    "err": false,
+    "string": "http://h.example/dir/a/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/a/",
+    "local_path": "dir/a/index.html",
+    "key": "http://h.example/dir/a/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": ".",
+   "result": {
+    "input": ".",
+    "err": false,
+    "string": "http://h.example/dir/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/",
+    "local_path": "dir/index.html",
+    "key": "http://h.example/dir/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "..",
+   "result": {
+    "input": "..",
+    "err": false,
+    "string": "http://h.example/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://h.example/"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/a//b",
+   "result": {
+    "input": "/a//b",
+    "err": false,
+    "string": "http://h.example/a//b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a//b",
+    "local_path": "a//b",
+    "key": "http://h.example/a//b"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "https://user:pw@x/p",
+   "result": {
+    "input": "https://user:pw@x/p",
+    "err": false,
+    "string": "https://user:pw@x/p",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "https://user:pw@x/p"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://[::1]:8080/v6",
+   "result": {
+    "input": "http://[::1]:8080/v6",
+    "err": false,
+    "string": "http://[::1]:8080/v6",
+    "scheme": "http",
+    "host": "[::1]:8080",
+    "hostname": "::1",
+    "path": "/v6",
+    "local_path": "v6",
+    "key": "http://[::1]:8080/v6"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://x:port/",
+   "result": {
+    "input": "http://x:port/",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://x:/p",
+   "result": {
+    "input": "http://x:/p",
+    "err": false,
+    "string": "http://x:/p",
+    "scheme": "http",
+    "host": "x:",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "http://x:/p"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/a%20b?c%20d#e%20f",
+   "result": {
+    "input": "/a%20b?c%20d#e%20f",
+    "err": false,
+    "string": "http://h.example/a%20b?c%20d#e%20f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a b",
+    "raw_query": "c%20d",
+    "fragment": "e f",
+    "local_path": "a b_c%2520d",
+    "key": "http://h.example/a%20b?c%20d"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://x/\u0001",
+   "result": {
+    "input": "http://x/\u0001",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/a+b",
+   "result": {
+    "input": "/a+b",
+    "err": false,
+    "string": "http://h.example/a+b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a+b",
+    "local_path": "a+b",
+    "key": "http://h.example/a+b"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/q?a+b=c d",
+   "result": {
+    "input": "/q?a+b=c d",
+    "err": false,
+    "string": "http://h.example/q?a+b=c d",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/q",
+    "raw_query": "a+b=c d",
+    "local_path": "q_a%2Bb%3Dc+d",
+    "key": "http://h.example/q?a+b=c d"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "#",
+   "result": {
+    "input": "#",
+    "err": false,
+    "string": "http://h.example/dir/page.html?q=1#top",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "raw_query": "q=1",
+    "fragment": "top",
+    "local_path": "dir/page.html_q%3D1",
+    "key": "http://h.example/dir/page.html?q=1"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "?#",
+   "result": {
+    "input": "?#",
+    "err": false,
+    "string": "http://h.example/dir/page.html?",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/dir/page.html",
+    "local_path": "dir/page.html",
+    "key": "http://h.example/dir/page.html?"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "/p#a%23b",
+   "result": {
+    "input": "/p#a%23b",
+    "err": false,
+    "string": "http://h.example/p#a%23b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/p",
+    "fragment": "a#b",
+    "local_path": "p",
+    "key": "http://h.example/p"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "//x/?",
+   "result": {
+    "input": "//x/?",
+    "err": false,
+    "string": "http://x/?",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://x/?"
+   }
+  },
+  {
+   "base": "http://h.example/dir/page.html?q=1#top",
+   "ref": "http://x?only",
+   "result": {
+    "input": "http://x?only",
+    "err": false,
+    "string": "http://x?only",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "raw_query": "only",
+    "local_path": "index.html_only",
+    "key": "http://x?only"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "",
+   "result": {
+    "input": "",
+    "err": false,
+    "string": "https://h.example",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "local_path": "index.html",
+    "key": "https://h.example"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a",
+   "result": {
+    "input": "a",
+    "err": false,
+    "string": "https://h.example/a",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "https://h.example/a"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a/b",
+   "result": {
+    "input": "a/b",
+    "err": false,
+    "string": "https://h.example/a/b",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "local_path": "a/b",
+    "key": "https://h.example/a/b"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "./a",
+   "result": {
+    "input": "./a",
+    "err": false,
+    "string": "https://h.example/a",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "https://h.example/a"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "../a",
+   "result": {
+    "input": "../a",
+    "err": false,
+    "string": "https://h.example/a",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "https://h.example/a"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "../../../../a",
+   "result": {
+    "input": "../../../../a",
+    "err": false,
+    "string": "https://h.example/a",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "https://h.example/a"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/a/./b/../c",
+   "result": {
+    "input": "/a/./b/../c",
+    "err": false,
+    "string": "https://h.example/a/c",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/c",
+    "local_path": "a/c",
+    "key": "https://h.example/a/c"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/",
+   "result": {
+    "input": "/",
+    "err": false,
+    "string": "https://h.example/",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://h.example/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "//other.example/x",
+   "result": {
+    "input": "//other.example/x",
+    "err": false,
+    "string": "https://other.example/x",
+    "scheme": "https",
+    "host": "other.example",
+    "hostname": "other.example",
+    "path": "/x",
+    "local_path": "x",
+    "key": "https://other.example/x"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "//OTHER.example:8080",
+   "result": {
+    "input": "//OTHER.example:8080",
+    "err": false,
+    "string": "https://OTHER.example:8080",
+    "scheme": "https",
+    "host": "OTHER.example:8080",
+    "hostname": "OTHER.example",
+    "local_path": "index.html",
+    "key": "https://OTHER.example:8080"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "?q=1",
+   "result": {
+    "input": "?q=1",
+    "err": false,
+    "string": "https://h.example?q=1",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "raw_query": "q=1",
+    "local_path": "index.html_q%3D1",
+    "key": "https://h.example?q=1"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "?",
+   "result": {
+    "input": "?",
+    "err": false,
+    "string": "https://h.example?",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "local_path": "index.html",
+    "key": "https://h.example?"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "#frag",
+   "result": {
+    "input": "#frag",
+    "err": false,
+    "string": "https://h.example#frag",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "fragment": "frag",
+    "local_path": "index.html",
+    "key": "https://h.example"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a#f",
+   "result": {
+    "input": "a#f",
+    "err": false,
+    "string": "https://h.example/a#f",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "fragment": "f",
+    "local_path": "a",
+    "key": "https://h.example/a"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a?x=1\u0026y=2#f",
+   "result": {
+    "input": "a?x=1\u0026y=2#f",
+    "err": false,
+    "string": "https://h.example/a?x=1\u0026y=2#f",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "raw_query": "x=1\u0026y=2",
+    "fragment": "f",
+    "local_path": "a_x%3D1%26y%3D2",
+    "key": "https://h.example/a?x=1\u0026y=2"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/sp ace",
+   "result": {
+    "input": "/sp ace",
+    "err": false,
+    "string": "https://h.example/sp%20ace",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/sp ace",
+    "local_path": "sp ace",
+    "key": "https://h.example/sp%20ace"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/%41%2fb",
+   "result": {
+    "input": "/%41%2fb",
+    "err": false,
+    "string": "https://h.example/%41%2fb",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/A/b",
+    "local_path": "A/b",
+    "key": "https://h.example/%41%2fb"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/%zz",
+   "result": {
+    "input": "/%zz",
+    "err": true
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/caf%C3%A9",
+   "result": {
+    "input": "/caf%C3%A9",
+    "err": false,
+    "string": "https://h.example/caf%C3%A9",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "https://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/café",
+   "result": {
+    "input": "/café",
+    "err": false,
+    "string": "https://h.example/caf%C3%A9",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "https://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://H.Example:80/A",
+   "result": {
+    "input": "http://H.Example:80/A",
+    "err": false,
+    "string": "http://H.Example:80/A",
+    "scheme": "http",
+    "host": "H.Example:80",
+    "hostname": "H.Example",
+    "path": "/A",
+    "local_path": "A",
+    "key": "http://H.Example:80/A"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "https://x/a/b/../../..",
+   "result": {
+    "input": "https://x/a/b/../../..",
+    "err": false,
+    "string": "https://x/",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://x/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "HTTP://x",
+   "result": {
+    "input": "HTTP://x",
+    "err": false,
+    "string": "http://x",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "local_path": "index.html",
+    "key": "http://x"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "mailto:a@b",
+   "result": {
+    "input": "mailto:a@b",
+    "err": false,
+    "string": "mailto:a@b",
+    "scheme": "mailto",
+    "local_path": "index.html",
+    "key": "mailto:a@b"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "javascript:alert(1)",
+   "result": {
+    "input": "javascript:alert(1)",
+    "err": false,
+    "string": "javascript:alert(1)",
+    "scheme": "javascript",
+    "local_path": "index.html",
+    "key": "javascript:alert(1)"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "ftp://x/y",
+   "result": {
+    "input": "ftp://x/y",
+    "err": false,
+    "string": "ftp://x/y",
+    "scheme": "ftp",
+    "host": "x",
+    "hostname": "x",
+    "path": "/y",
+    "local_path": "y",
+    "key": "ftp://x/y"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "x:y",
+   "result": {
+    "input": "x:y",
+    "err": false,
+    "string": "x:y",
+    "scheme": "x",
+    "local_path": "index.html",
+    "key": "x:y"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a:b/c",
+   "result": {
+    "input": "a:b/c",
+    "err": false,
+    "string": "a:b/c",
+    "scheme": "a",
+    "local_path": "index.html",
+    "key": "a:b/c"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/a?b?c",
+   "result": {
+    "input": "/a?b?c",
+    "err": false,
+    "string": "https://h.example/a?b?c",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "raw_query": "b?c",
+    "local_path": "a_b%3Fc",
+    "key": "https://h.example/a?b?c"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a/..",
+   "result": {
+    "input": "a/..",
+    "err": false,
+    "string": "https://h.example/",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://h.example/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "a/.",
+   "result": {
+    "input": "a/.",
+    "err": false,
+    "string": "https://h.example/a/",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/",
+    "local_path": "a/index.html",
+    "key": "https://h.example/a/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": ".",
+   "result": {
+    "input": ".",
+    "err": false,
+    "string": "https://h.example/",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://h.example/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "..",
+   "result": {
+    "input": "..",
+    "err": false,
+    "string": "https://h.example/",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://h.example/"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/a//b",
+   "result": {
+    "input": "/a//b",
+    "err": false,
+    "string": "https://h.example/a//b",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a//b",
+    "local_path": "a//b",
+    "key": "https://h.example/a//b"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "https://user:pw@x/p",
+   "result": {
+    "input": "https://user:pw@x/p",
+    "err": false,
+    "string": "https://user:pw@x/p",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "https://user:pw@x/p"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://[::1]:8080/v6",
+   "result": {
+    "input": "http://[::1]:8080/v6",
+    "err": false,
+    "string": "http://[::1]:8080/v6",
+    "scheme": "http",
+    "host": "[::1]:8080",
+    "hostname": "::1",
+    "path": "/v6",
+    "local_path": "v6",
+    "key": "http://[::1]:8080/v6"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://x:port/",
+   "result": {
+    "input": "http://x:port/",
+    "err": true
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://x:/p",
+   "result": {
+    "input": "http://x:/p",
+    "err": false,
+    "string": "http://x:/p",
+    "scheme": "http",
+    "host": "x:",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "http://x:/p"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/a%20b?c%20d#e%20f",
+   "result": {
+    "input": "/a%20b?c%20d#e%20f",
+    "err": false,
+    "string": "https://h.example/a%20b?c%20d#e%20f",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a b",
+    "raw_query": "c%20d",
+    "fragment": "e f",
+    "local_path": "a b_c%2520d",
+    "key": "https://h.example/a%20b?c%20d"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://x/\u0001",
+   "result": {
+    "input": "http://x/\u0001",
+    "err": true
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/a+b",
+   "result": {
+    "input": "/a+b",
+    "err": false,
+    "string": "https://h.example/a+b",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a+b",
+    "local_path": "a+b",
+    "key": "https://h.example/a+b"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/q?a+b=c d",
+   "result": {
+    "input": "/q?a+b=c d",
+    "err": false,
+    "string": "https://h.example/q?a+b=c d",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/q",
+    "raw_query": "a+b=c d",
+    "local_path": "q_a%2Bb%3Dc+d",
+    "key": "https://h.example/q?a+b=c d"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "#",
+   "result": {
+    "input": "#",
+    "err": false,
+    "string": "https://h.example",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "local_path": "index.html",
+    "key": "https://h.example"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "?#",
+   "result": {
+    "input": "?#",
+    "err": false,
+    "string": "https://h.example?",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "local_path": "index.html",
+    "key": "https://h.example?"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "/p#a%23b",
+   "result": {
+    "input": "/p#a%23b",
+    "err": false,
+    "string": "https://h.example/p#a%23b",
+    "scheme": "https",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/p",
+    "fragment": "a#b",
+    "local_path": "p",
+    "key": "https://h.example/p"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "//x/?",
+   "result": {
+    "input": "//x/?",
+    "err": false,
+    "string": "https://x/?",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://x/?"
+   }
+  },
+  {
+   "base": "https://h.example",
+   "ref": "http://x?only",
+   "result": {
+    "input": "http://x?only",
+    "err": false,
+    "string": "http://x?only",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "raw_query": "only",
+    "local_path": "index.html_only",
+    "key": "http://x?only"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "",
+   "result": {
+    "input": "",
+    "err": false,
+    "string": "http://h.example:8080/a/b/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a",
+   "result": {
+    "input": "a",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a",
+    "local_path": "a/b/a",
+    "key": "http://h.example:8080/a/b/a"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a/b",
+   "result": {
+    "input": "a/b",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a/b",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a/b",
+    "local_path": "a/b/a/b",
+    "key": "http://h.example:8080/a/b/a/b"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "./a",
+   "result": {
+    "input": "./a",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a",
+    "local_path": "a/b/a",
+    "key": "http://h.example:8080/a/b/a"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "../a",
+   "result": {
+    "input": "../a",
+    "err": false,
+    "string": "http://h.example:8080/a/a",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/a",
+    "local_path": "a/a",
+    "key": "http://h.example:8080/a/a"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "../../../../a",
+   "result": {
+    "input": "../../../../a",
+    "err": false,
+    "string": "http://h.example:8080/a",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "http://h.example:8080/a"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/a/./b/../c",
+   "result": {
+    "input": "/a/./b/../c",
+    "err": false,
+    "string": "http://h.example:8080/a/c",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/c",
+    "local_path": "a/c",
+    "key": "http://h.example:8080/a/c"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/",
+   "result": {
+    "input": "/",
+    "err": false,
+    "string": "http://h.example:8080/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://h.example:8080/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "//other.example/x",
+   "result": {
+    "input": "//other.example/x",
+    "err": false,
+    "string": "http://other.example/x",
+    "scheme": "http",
+    "host": "other.example",
+    "hostname": "other.example",
+    "path": "/x",
+    "local_path": "x",
+    "key": "http://other.example/x"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "//OTHER.example:8080",
+   "result": {
+    "input": "//OTHER.example:8080",
+    "err": false,
+    "string": "http://OTHER.example:8080",
+    "scheme": "http",
+    "host": "OTHER.example:8080",
+    "hostname": "OTHER.example",
+    "local_path": "index.html",
+    "key": "http://OTHER.example:8080"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "?q=1",
+   "result": {
+    "input": "?q=1",
+    "err": false,
+    "string": "http://h.example:8080/a/b/?q=1",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "raw_query": "q=1",
+    "local_path": "a/b/index.html_q%3D1",
+    "key": "http://h.example:8080/a/b/?q=1"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "?",
+   "result": {
+    "input": "?",
+    "err": false,
+    "string": "http://h.example:8080/a/b/?",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/?"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "#frag",
+   "result": {
+    "input": "#frag",
+    "err": false,
+    "string": "http://h.example:8080/a/b/#frag",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "fragment": "frag",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a#f",
+   "result": {
+    "input": "a#f",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a#f",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a",
+    "fragment": "f",
+    "local_path": "a/b/a",
+    "key": "http://h.example:8080/a/b/a"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a?x=1\u0026y=2#f",
+   "result": {
+    "input": "a?x=1\u0026y=2#f",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a?x=1\u0026y=2#f",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a",
+    "raw_query": "x=1\u0026y=2",
+    "fragment": "f",
+    "local_path": "a/b/a_x%3D1%26y%3D2",
+    "key": "http://h.example:8080/a/b/a?x=1\u0026y=2"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/sp ace",
+   "result": {
+    "input": "/sp ace",
+    "err": false,
+    "string": "http://h.example:8080/sp%20ace",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/sp ace",
+    "local_path": "sp ace",
+    "key": "http://h.example:8080/sp%20ace"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/%41%2fb",
+   "result": {
+    "input": "/%41%2fb",
+    "err": false,
+    "string": "http://h.example:8080/%41%2fb",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/A/b",
+    "local_path": "A/b",
+    "key": "http://h.example:8080/%41%2fb"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/%zz",
+   "result": {
+    "input": "/%zz",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/caf%C3%A9",
+   "result": {
+    "input": "/caf%C3%A9",
+    "err": false,
+    "string": "http://h.example:8080/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example:8080/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/café",
+   "result": {
+    "input": "/café",
+    "err": false,
+    "string": "http://h.example:8080/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example:8080/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://H.Example:80/A",
+   "result": {
+    "input": "http://H.Example:80/A",
+    "err": false,
+    "string": "http://H.Example:80/A",
+    "scheme": "http",
+    "host": "H.Example:80",
+    "hostname": "H.Example",
+    "path": "/A",
+    "local_path": "A",
+    "key": "http://H.Example:80/A"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "https://x/a/b/../../..",
+   "result": {
+    "input": "https://x/a/b/../../..",
+    "err": false,
+    "string": "https://x/",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://x/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "HTTP://x",
+   "result": {
+    "input": "HTTP://x",
+    "err": false,
+    "string": "http://x",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "local_path": "index.html",
+    "key": "http://x"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "mailto:a@b",
+   "result": {
+    "input": "mailto:a@b",
+    "err": false,
+    "string": "mailto:a@b",
+    "scheme": "mailto",
+    "local_path": "index.html",
+    "key": "mailto:a@b"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "javascript:alert(1)",
+   "result": {
+    "input": "javascript:alert(1)",
+    "err": false,
+    "string": "javascript:alert(1)",
+    "scheme": "javascript",
+    "local_path": "index.html",
+    "key": "javascript:alert(1)"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "ftp://x/y",
+   "result": {
+    "input": "ftp://x/y",
+    "err": false,
+    "string": "ftp://x/y",
+    "scheme": "ftp",
+    "host": "x",
+    "hostname": "x",
+    "path": "/y",
+    "local_path": "y",
+    "key": "ftp://x/y"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "x:y",
+   "result": {
+    "input": "x:y",
+    "err": false,
+    "string": "x:y",
+    "scheme": "x",
+    "local_path": "index.html",
+    "key": "x:y"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a:b/c",
+   "result": {
+    "input": "a:b/c",
+    "err": false,
+    "string": "a:b/c",
+    "scheme": "a",
+    "local_path": "index.html",
+    "key": "a:b/c"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/a?b?c",
+   "result": {
+    "input": "/a?b?c",
+    "err": false,
+    "string": "http://h.example:8080/a?b?c",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a",
+    "raw_query": "b?c",
+    "local_path": "a_b%3Fc",
+    "key": "http://h.example:8080/a?b?c"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a/..",
+   "result": {
+    "input": "a/..",
+    "err": false,
+    "string": "http://h.example:8080/a/b/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "a/.",
+   "result": {
+    "input": "a/.",
+    "err": false,
+    "string": "http://h.example:8080/a/b/a/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/a/",
+    "local_path": "a/b/a/index.html",
+    "key": "http://h.example:8080/a/b/a/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": ".",
+   "result": {
+    "input": ".",
+    "err": false,
+    "string": "http://h.example:8080/a/b/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "..",
+   "result": {
+    "input": "..",
+    "err": false,
+    "string": "http://h.example:8080/a/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/",
+    "local_path": "a/index.html",
+    "key": "http://h.example:8080/a/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/a//b",
+   "result": {
+    "input": "/a//b",
+    "err": false,
+    "string": "http://h.example:8080/a//b",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a//b",
+    "local_path": "a//b",
+    "key": "http://h.example:8080/a//b"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "https://user:pw@x/p",
+   "result": {
+    "input": "https://user:pw@x/p",
+    "err": false,
+    "string": "https://user:pw@x/p",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "https://user:pw@x/p"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://[::1]:8080/v6",
+   "result": {
+    "input": "http://[::1]:8080/v6",
+    "err": false,
+    "string": "http://[::1]:8080/v6",
+    "scheme": "http",
+    "host": "[::1]:8080",
+    "hostname": "::1",
+    "path": "/v6",
+    "local_path": "v6",
+    "key": "http://[::1]:8080/v6"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://x:port/",
+   "result": {
+    "input": "http://x:port/",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://x:/p",
+   "result": {
+    "input": "http://x:/p",
+    "err": false,
+    "string": "http://x:/p",
+    "scheme": "http",
+    "host": "x:",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "http://x:/p"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/a%20b?c%20d#e%20f",
+   "result": {
+    "input": "/a%20b?c%20d#e%20f",
+    "err": false,
+    "string": "http://h.example:8080/a%20b?c%20d#e%20f",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a b",
+    "raw_query": "c%20d",
+    "fragment": "e f",
+    "local_path": "a b_c%2520d",
+    "key": "http://h.example:8080/a%20b?c%20d"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://x/\u0001",
+   "result": {
+    "input": "http://x/\u0001",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/a+b",
+   "result": {
+    "input": "/a+b",
+    "err": false,
+    "string": "http://h.example:8080/a+b",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a+b",
+    "local_path": "a+b",
+    "key": "http://h.example:8080/a+b"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/q?a+b=c d",
+   "result": {
+    "input": "/q?a+b=c d",
+    "err": false,
+    "string": "http://h.example:8080/q?a+b=c d",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/q",
+    "raw_query": "a+b=c d",
+    "local_path": "q_a%2Bb%3Dc+d",
+    "key": "http://h.example:8080/q?a+b=c d"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "#",
+   "result": {
+    "input": "#",
+    "err": false,
+    "string": "http://h.example:8080/a/b/",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "?#",
+   "result": {
+    "input": "?#",
+    "err": false,
+    "string": "http://h.example:8080/a/b/?",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/a/b/",
+    "local_path": "a/b/index.html",
+    "key": "http://h.example:8080/a/b/?"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "/p#a%23b",
+   "result": {
+    "input": "/p#a%23b",
+    "err": false,
+    "string": "http://h.example:8080/p#a%23b",
+    "scheme": "http",
+    "host": "h.example:8080",
+    "hostname": "h.example",
+    "path": "/p",
+    "fragment": "a#b",
+    "local_path": "p",
+    "key": "http://h.example:8080/p"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "//x/?",
+   "result": {
+    "input": "//x/?",
+    "err": false,
+    "string": "http://x/?",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://x/?"
+   }
+  },
+  {
+   "base": "http://h.example:8080/a/b/",
+   "ref": "http://x?only",
+   "result": {
+    "input": "http://x?only",
+    "err": false,
+    "string": "http://x?only",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "raw_query": "only",
+    "local_path": "index.html_only",
+    "key": "http://x?only"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "",
+   "result": {
+    "input": "",
+    "err": false,
+    "string": "http://h.example/a/b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "local_path": "a/b",
+    "key": "http://h.example/a/b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a",
+   "result": {
+    "input": "a",
+    "err": false,
+    "string": "http://h.example/a/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a",
+    "local_path": "a/a",
+    "key": "http://h.example/a/a"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a/b",
+   "result": {
+    "input": "a/b",
+    "err": false,
+    "string": "http://h.example/a/a/b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a/b",
+    "local_path": "a/a/b",
+    "key": "http://h.example/a/a/b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "./a",
+   "result": {
+    "input": "./a",
+    "err": false,
+    "string": "http://h.example/a/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a",
+    "local_path": "a/a",
+    "key": "http://h.example/a/a"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "../a",
+   "result": {
+    "input": "../a",
+    "err": false,
+    "string": "http://h.example/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "http://h.example/a"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "../../../../a",
+   "result": {
+    "input": "../../../../a",
+    "err": false,
+    "string": "http://h.example/a",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "local_path": "a",
+    "key": "http://h.example/a"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/a/./b/../c",
+   "result": {
+    "input": "/a/./b/../c",
+    "err": false,
+    "string": "http://h.example/a/c",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/c",
+    "local_path": "a/c",
+    "key": "http://h.example/a/c"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/",
+   "result": {
+    "input": "/",
+    "err": false,
+    "string": "http://h.example/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://h.example/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "//other.example/x",
+   "result": {
+    "input": "//other.example/x",
+    "err": false,
+    "string": "http://other.example/x",
+    "scheme": "http",
+    "host": "other.example",
+    "hostname": "other.example",
+    "path": "/x",
+    "local_path": "x",
+    "key": "http://other.example/x"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "//OTHER.example:8080",
+   "result": {
+    "input": "//OTHER.example:8080",
+    "err": false,
+    "string": "http://OTHER.example:8080",
+    "scheme": "http",
+    "host": "OTHER.example:8080",
+    "hostname": "OTHER.example",
+    "local_path": "index.html",
+    "key": "http://OTHER.example:8080"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "?q=1",
+   "result": {
+    "input": "?q=1",
+    "err": false,
+    "string": "http://h.example/a/b?q=1",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "raw_query": "q=1",
+    "local_path": "a/b_q%3D1",
+    "key": "http://h.example/a/b?q=1"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "?",
+   "result": {
+    "input": "?",
+    "err": false,
+    "string": "http://h.example/a/b?",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "local_path": "a/b",
+    "key": "http://h.example/a/b?"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "#frag",
+   "result": {
+    "input": "#frag",
+    "err": false,
+    "string": "http://h.example/a/b#frag",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "fragment": "frag",
+    "local_path": "a/b",
+    "key": "http://h.example/a/b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a#f",
+   "result": {
+    "input": "a#f",
+    "err": false,
+    "string": "http://h.example/a/a#f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a",
+    "fragment": "f",
+    "local_path": "a/a",
+    "key": "http://h.example/a/a"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a?x=1\u0026y=2#f",
+   "result": {
+    "input": "a?x=1\u0026y=2#f",
+    "err": false,
+    "string": "http://h.example/a/a?x=1\u0026y=2#f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a",
+    "raw_query": "x=1\u0026y=2",
+    "fragment": "f",
+    "local_path": "a/a_x%3D1%26y%3D2",
+    "key": "http://h.example/a/a?x=1\u0026y=2"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/sp ace",
+   "result": {
+    "input": "/sp ace",
+    "err": false,
+    "string": "http://h.example/sp%20ace",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/sp ace",
+    "local_path": "sp ace",
+    "key": "http://h.example/sp%20ace"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/%41%2fb",
+   "result": {
+    "input": "/%41%2fb",
+    "err": false,
+    "string": "http://h.example/%41%2fb",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/A/b",
+    "local_path": "A/b",
+    "key": "http://h.example/%41%2fb"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/%zz",
+   "result": {
+    "input": "/%zz",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/caf%C3%A9",
+   "result": {
+    "input": "/caf%C3%A9",
+    "err": false,
+    "string": "http://h.example/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/café",
+   "result": {
+    "input": "/café",
+    "err": false,
+    "string": "http://h.example/caf%C3%A9",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/café",
+    "local_path": "café",
+    "key": "http://h.example/caf%C3%A9"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://H.Example:80/A",
+   "result": {
+    "input": "http://H.Example:80/A",
+    "err": false,
+    "string": "http://H.Example:80/A",
+    "scheme": "http",
+    "host": "H.Example:80",
+    "hostname": "H.Example",
+    "path": "/A",
+    "local_path": "A",
+    "key": "http://H.Example:80/A"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "https://x/a/b/../../..",
+   "result": {
+    "input": "https://x/a/b/../../..",
+    "err": false,
+    "string": "https://x/",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "https://x/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "HTTP://x",
+   "result": {
+    "input": "HTTP://x",
+    "err": false,
+    "string": "http://x",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "local_path": "index.html",
+    "key": "http://x"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "mailto:a@b",
+   "result": {
+    "input": "mailto:a@b",
+    "err": false,
+    "string": "mailto:a@b",
+    "scheme": "mailto",
+    "local_path": "index.html",
+    "key": "mailto:a@b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "javascript:alert(1)",
+   "result": {
+    "input": "javascript:alert(1)",
+    "err": false,
+    "string": "javascript:alert(1)",
+    "scheme": "javascript",
+    "local_path": "index.html",
+    "key": "javascript:alert(1)"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "ftp://x/y",
+   "result": {
+    "input": "ftp://x/y",
+    "err": false,
+    "string": "ftp://x/y",
+    "scheme": "ftp",
+    "host": "x",
+    "hostname": "x",
+    "path": "/y",
+    "local_path": "y",
+    "key": "ftp://x/y"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "x:y",
+   "result": {
+    "input": "x:y",
+    "err": false,
+    "string": "x:y",
+    "scheme": "x",
+    "local_path": "index.html",
+    "key": "x:y"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a:b/c",
+   "result": {
+    "input": "a:b/c",
+    "err": false,
+    "string": "a:b/c",
+    "scheme": "a",
+    "local_path": "index.html",
+    "key": "a:b/c"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/a?b?c",
+   "result": {
+    "input": "/a?b?c",
+    "err": false,
+    "string": "http://h.example/a?b?c",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a",
+    "raw_query": "b?c",
+    "local_path": "a_b%3Fc",
+    "key": "http://h.example/a?b?c"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a/..",
+   "result": {
+    "input": "a/..",
+    "err": false,
+    "string": "http://h.example/a/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/",
+    "local_path": "a/index.html",
+    "key": "http://h.example/a/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "a/.",
+   "result": {
+    "input": "a/.",
+    "err": false,
+    "string": "http://h.example/a/a/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/a/",
+    "local_path": "a/a/index.html",
+    "key": "http://h.example/a/a/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": ".",
+   "result": {
+    "input": ".",
+    "err": false,
+    "string": "http://h.example/a/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/",
+    "local_path": "a/index.html",
+    "key": "http://h.example/a/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "..",
+   "result": {
+    "input": "..",
+    "err": false,
+    "string": "http://h.example/",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://h.example/"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/a//b",
+   "result": {
+    "input": "/a//b",
+    "err": false,
+    "string": "http://h.example/a//b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a//b",
+    "local_path": "a//b",
+    "key": "http://h.example/a//b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "https://user:pw@x/p",
+   "result": {
+    "input": "https://user:pw@x/p",
+    "err": false,
+    "string": "https://user:pw@x/p",
+    "scheme": "https",
+    "host": "x",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "https://user:pw@x/p"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://[::1]:8080/v6",
+   "result": {
+    "input": "http://[::1]:8080/v6",
+    "err": false,
+    "string": "http://[::1]:8080/v6",
+    "scheme": "http",
+    "host": "[::1]:8080",
+    "hostname": "::1",
+    "path": "/v6",
+    "local_path": "v6",
+    "key": "http://[::1]:8080/v6"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://x:port/",
+   "result": {
+    "input": "http://x:port/",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://x:/p",
+   "result": {
+    "input": "http://x:/p",
+    "err": false,
+    "string": "http://x:/p",
+    "scheme": "http",
+    "host": "x:",
+    "hostname": "x",
+    "path": "/p",
+    "local_path": "p",
+    "key": "http://x:/p"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/a%20b?c%20d#e%20f",
+   "result": {
+    "input": "/a%20b?c%20d#e%20f",
+    "err": false,
+    "string": "http://h.example/a%20b?c%20d#e%20f",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a b",
+    "raw_query": "c%20d",
+    "fragment": "e f",
+    "local_path": "a b_c%2520d",
+    "key": "http://h.example/a%20b?c%20d"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://x/\u0001",
+   "result": {
+    "input": "http://x/\u0001",
+    "err": true
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/a+b",
+   "result": {
+    "input": "/a+b",
+    "err": false,
+    "string": "http://h.example/a+b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a+b",
+    "local_path": "a+b",
+    "key": "http://h.example/a+b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/q?a+b=c d",
+   "result": {
+    "input": "/q?a+b=c d",
+    "err": false,
+    "string": "http://h.example/q?a+b=c d",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/q",
+    "raw_query": "a+b=c d",
+    "local_path": "q_a%2Bb%3Dc+d",
+    "key": "http://h.example/q?a+b=c d"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "#",
+   "result": {
+    "input": "#",
+    "err": false,
+    "string": "http://h.example/a/b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "local_path": "a/b",
+    "key": "http://h.example/a/b"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "?#",
+   "result": {
+    "input": "?#",
+    "err": false,
+    "string": "http://h.example/a/b?",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/a/b",
+    "local_path": "a/b",
+    "key": "http://h.example/a/b?"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "/p#a%23b",
+   "result": {
+    "input": "/p#a%23b",
+    "err": false,
+    "string": "http://h.example/p#a%23b",
+    "scheme": "http",
+    "host": "h.example",
+    "hostname": "h.example",
+    "path": "/p",
+    "fragment": "a#b",
+    "local_path": "p",
+    "key": "http://h.example/p"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "//x/?",
+   "result": {
+    "input": "//x/?",
+    "err": false,
+    "string": "http://x/?",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "path": "/",
+    "local_path": "index.html",
+    "key": "http://x/?"
+   }
+  },
+  {
+   "base": "http://h.example/a/b",
+   "ref": "http://x?only",
+   "result": {
+    "input": "http://x?only",
+    "err": false,
+    "string": "http://x?only",
+    "scheme": "http",
+    "host": "x",
+    "hostname": "x",
+    "raw_query": "only",
+    "local_path": "index.html_only",
+    "key": "http://x?only"
+   }
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-.TH VAULT-GET 1 "September 2026" "vault" "User Commands"
+.TH VAULT-GET 1 "October 2026" "vault" "User Commands"
 .SH NAME
 vault-get \- decrypt a stored file
 .SH SYNOPSIS
@@ -13,13 +13,18 @@ vault-get \- decrypt a stored file
 .I NAME
 .SH DESCRIPTION
 Decrypts \fINAME\fR. Nothing appears at the output path until every object has
-authenticated. The stored mode and modification time are restored. It refuses
-to overwrite an existing file. Takes a shared lock.
+authenticated, padding and end of file included; until then the output is a
+private temporary file in the same directory, removed on failure. The stored
+mode and modification time are restored. It never replaces anything already
+at the output path, including a symbolic link (even a dangling one) or a
+file created while it runs. Takes a shared lock.
 .PP
 With \fB\-r\fR, \fINAME\fR is a folder, and every file under it is
 decrypted into the output directory, keeping the folder structure. Each file
 is checked as above; a clash stops the run, leaving the files already
-written.
+written. Directories are created as needed, mode 0700; a symbolic link (or
+anything but a directory) where a directory belongs inside the output
+directory stops the run rather than being followed.
 .SH OPTIONS
 .TP
 .BI \-o " OUTPUT"

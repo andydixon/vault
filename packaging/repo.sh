@@ -10,37 +10,25 @@
 # Every index is rebuilt over all the packages in the repository, so other
 # projects publishing there with their copy of this script are kept.
 #
-# Needs: go, docker, gpg, apt-ftparchive (apt-utils), flock.
+# Needs: the pinned Rust toolchain with cargo-zigbuild and zig, go (to run
+# nfpm), docker, gpg, apt-ftparchive (apt-utils), flock.
 #   REPO_DIR        where the repository lives (default below)
 #   REPO_GNUPGHOME  GnuPG home holding the signing key (default below)
-#   ARCHS           Go architectures to package (default below)
+#   ARCHS           architectures to package (see packaging/package.sh)
+#
+# To build and inspect packages without signing or publishing, run
+# packaging/package.sh instead.
 #
 # The same script, with its own project block, is in ../mapsize/packaging.
 set -euo pipefail
 
-# ---- project ---------------------------------------------------------------
-NAME=vault           # the command
-# The package: plain "vault" is HashiCorp Vault in Arch's [extra] and in
-# HashiCorp's own apt and dnf repositories, which would win upgrades. Both
-# install /usr/bin/vault, so they conflict.
-PACKAGE=dixon-vault
-CONFLICTS=vault
-SUMMARY="Post-quantum encrypted file vault with a decoy passphrase"
-HOMEPAGE=https://dixon.cx/vault
-LICENSE=GPL-3.0-or-later
-MANPAGES=docs/*.1
-DOCS="README.md LICENSE"
-# build OUT: build the binary to OUT, in the source tree, with GOOS, GOARCH
-# and GOARM set and VERSION the release.
-build() {
-	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o "$1" .
-}
-# ----------------------------------------------------------------------------
+# The project (package name, contents, architectures) and the build live in
+# packaging/package.sh, which can also be run on its own to build and inspect
+# packages without signing or publishing anything.
+. "$(dirname "$0")/package.sh"
 
 REPO_DIR=${REPO_DIR:-/home/andy/domains/repo.dixon.cx/public_html}
 REPO_GNUPGHOME=${REPO_GNUPGHOME:-$HOME/.config/repo.dixon.cx/gnupg}
-ARCHS=${ARCHS:-"amd64 arm64 arm 386 riscv64"}
-NFPM="go run github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1"
 SUITE=stable
 COMPONENT=main
 ARCH_REPO=dixon # the pacman repository name: [dixon]
@@ -48,7 +36,7 @@ ARCH_REPO=dixon # the pacman repository name: [dixon]
 say() { echo "repo: $*" >&2; }
 die() { say "$*"; exit 1; }
 
-for tool in go docker gpg apt-ftparchive flock; do
+for tool in cargo cargo-zigbuild zig go docker gpg apt-ftparchive flock; do
 	command -v $tool >/dev/null || die "needs $tool"
 done
 [[ -d $REPO_DIR ]] || die "$REPO_DIR does not exist"
@@ -64,47 +52,13 @@ export VERSION
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
-git archive "$TAG" | tar -x -C "$WORK" --one-top-level=src
+mkdir -p "$WORK/src"
+git archive "$TAG" | tar -x -C "$WORK/src"
 gpg --batch --armor --export-secret-keys "$KEY" >"$WORK/signing.asc"
 
-# ---- build -----------------------------------------------------------------
+# ---- build ----------------------------------------------------------------
 say "building $PACKAGE $VERSION for $ARCHS"
-mkdir -p "$WORK/out"
-for arch in $ARCHS; do
-	goarm= nfarch=$arch
-	[[ $arch == arm ]] && goarm=7 nfarch=arm7
-	(cd "$WORK/src" && GOOS=linux GOARCH=$arch GOARM=$goarm build "$WORK/bin-$arch/$NAME")
-	{
-		cat <<-EOF
-		name: $PACKAGE
-		arch: $nfarch
-		platform: linux
-		version: $VERSION
-		release: 1
-		maintainer: Andy Dixon <andy@dixon.cx>
-		description: $SUMMARY
-		homepage: $HOMEPAGE
-		license: $LICENSE
-		conflicts: [${CONFLICTS:-}]
-		contents:
-		  - src: $WORK/bin-$arch/$NAME
-		    dst: /usr/bin/$NAME
-		    file_info: {mode: 0755}
-		EOF
-		for m in $(cd "$WORK/src" && ls $MANPAGES); do
-			printf '  - src: %s\n    dst: /usr/share/man/man1/%s\n    file_info: {mode: 0644}\n' \
-				"$WORK/src/$m" "$(basename "$m")"
-		done
-		for d in $DOCS; do
-			printf '  - src: %s\n    dst: /usr/share/doc/%s/%s\n    file_info: {mode: 0644}\n' \
-				"$WORK/src/$d" "$PACKAGE" "$d"
-		done
-		printf 'rpm:\n  signature:\n    key_file: %s\n' "$WORK/signing.asc"
-	} >"$WORK/nfpm-$arch.yaml"
-	for fmt in deb rpm archlinux; do
-		$NFPM pkg -f "$WORK/nfpm-$arch.yaml" -p $fmt -t "$WORK/out/" >/dev/null
-	done
-done
+RPM_SIGNING_KEY=$WORK/signing.asc build_packages "$WORK/src" "$WORK/out" "$VERSION"
 
 # ---- publish ---------------------------------------------------------------
 # One publisher at a time: the indexes cover every project's packages.

@@ -1,0 +1,72 @@
+{
+ "key": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+ "plaintext": "byte(i*13+7)",
+ "provenance": "oracle/go at 4c1507c, internal/stream/oracle_vectors_test.go",
+ "vectors": [
+  {
+   "size": 0,
+   "ct_len": 16,
+   "ct_sha256": "b5e6c4d4c2d8e2448c7b13550cb447361c6319f8303eb2189e3c00109946633e",
+   "ct_hex": "ebc87bb498d2cf767b620485d8e74873"
+  },
+  {
+   "size": 1,
+   "ct_len": 17,
+   "ct_sha256": "4b431b2d3c656dd5565f045f3afaa216a29bd624d84b14a6b15ad7fcdf0bcc3c",
+   "ct_hex": "13e2ae1e27b20a055d353c18584d29dfec"
+  },
+  {
+   "size": 15,
+   "ct_len": 31,
+   "ct_sha256": "a226ce0a65bacca756d4620c4a8103df0009486b7db9a36c577ac305c03f23bb",
+   "ct_hex": "13485b85b3b4d036ed77edd5eb120ae816391a9b23c88452779018a527ffd0"
+  },
+  {
+   "size": 16,
+   "ct_len": 32,
+   "ct_sha256": "fa29f52ecc1bce80108d7fc89f1d55ec231ab3eb9308d0ded0bb525e3ec6addd",
+   "ct_hex": "13485b85b3b4d036ed77edd5eb120afe1d7171433f4aa6d81d9f1a1c43f1563f"
+  },
+  {
+   "size": 17,
+   "ct_len": 33,
+   "ct_sha256": "e7519a9721bc45677ae60f546e6b1909ad89b6bd9041388f5b501efbbfd956de",
+   "ct_hex": "13485b85b3b4d036ed77edd5eb120afe778bfe094bac290062ec1b004fabc63ceb"
+  },
+  {
+   "size": 65535,
+   "ct_len": 65551,
+   "ct_sha256": "89435c31d8a1759df899f6fd7bc9a030ad0ef2d9151b746fb289fe994d9f567a"
+  },
+  {
+   "size": 65536,
+   "ct_len": 65552,
+   "ct_sha256": "2b1c36c92c08df57448197d86efb6b321e29141ffb1b241eb3f90961f760a9b6"
+  },
+  {
+   "size": 65537,
+   "ct_len": 65569,
+   "ct_sha256": "eb41600f5ad326e7d7056ae89e94bd29a05525e8b471c210af4a1b4275798a09"
+  },
+  {
+   "size": 131072,
+   "ct_len": 131104,
+   "ct_sha256": "752ee27990e31a12fe923039a1a7fcd83f267fd3e9a237cab86f6df7575d4350"
+  },
+  {
+   "size": 131073,
+   "ct_len": 131121,
+   "ct_sha256": "b93769dc38c7cebe0aa0196e2124f20eff2e50bdab01ed03313dcc29bef39c38"
+  },
+  {
+   "size": 196592,
+   "ct_len": 196640,
+   "ct_sha256": "7ca38701023c57deb64762376269ea37f32b8f462fd57db22ba99b3a6a440ba3"
+  },
+  {
+   "size": 300000,
+   "ct_len": 300080,
+   "ct_sha256": "ecd2f49ba7cd7d4efc39243d10e9ae4264fc4b5e182a92335587dd54822eefac"
+  }
+ ]
+}

@@ -32,6 +32,14 @@ memory is locked against swapping and excluded from core dumps; on Linux the
 helper is also not debuggable. It answers only on a Unix socket inside
 \fI$XDG_RUNTIME_DIR/vault-UID\fR (or the temporary directory), a directory
 that must belong to this user with mode 0700. Rebooting ends it too.
+If the helper cannot lock its memory, disable core dumps or (on Linux) make
+itself undebuggable, it refuses the key and
+.B unlock
+fails, saying why. The helper is the same program, started with the
+passphrase variables removed from its environment. Helpers started by
+earlier (Go) versions of vault are compatible and can be used and locked.
+.PP
+Not available on Windows, where every command asks for the passphrase.
 .PP
 While the key is unlocked, any program running as this user can use it, and
 it is whichever key the passphrase opened, real or decoy. Lock before

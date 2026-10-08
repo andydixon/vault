@@ -221,15 +221,17 @@ Linux PC or server & almost everything & vault-linux-amd64 \\
 Linux on ARM64 & Pi 4/5 (64-bit OS), Graviton, Ampere & vault-linux-arm64 \\
 Raspberry Pi, 32-bit & Pi 2, 3, 4 on a 32-bit OS & vault-linux-armv7 \\
 Raspberry Pi Zero / 1 & the tiny older ones & vault-linux-armv6 \\
-Android & in Termux & vault-android-arm64 \\
-FreeBSD, OpenBSD, NetBSD & amd64, arm64, 386, arm\ldots & vault-freebsd-amd64 etc. \\
-Something exotic & RISC-V, POWER, s390x, MIPS, LoongArch & see \cmd{dist/} \\
+Android & in Termux: the Linux ARM64 file & vault-linux-arm64 \\
+FreeBSD & amd64 or 386 & vault-freebsd-amd64 etc. \\
+Something exotic & RISC-V, POWER (little-endian), s390x, LoongArch & see \cmd{dist/} \\
 \end{vtable}
 
 \begin{squirrel}
-The full release covers 43 platform builds, including AIX, Solaris, illumos,
-Plan~9 and even WebAssembly. Will you ever need \file{vault-plan9-arm}?
-Almost certainly not. Is it pleasing that it exists? Extremely.
+The release covers sixteen builds for Linux, Windows, macOS and FreeBSD,
+from Windows on ARM to IBM mainframes. The older Go builds reached further,
+to Plan~9 and WebAssembly; \file{docs/PLATFORMS.md} says why those went. Will you ever need
+\file{vault-linux-s390x}? Almost certainly not. Is it pleasing that it
+exists? Extremely.
 \end{squirrel}
 
 \begin{headsup}
@@ -287,8 +289,8 @@ so Gatekeeper quarantines it. Once you've checked the SHA-256, clear the flag:
 
 \subsection{Android (Termux)}
 \begin{shell}
-$ curl -LO https://.../vault-android-arm64
-$ chmod +x vault-android-arm64 && mv vault-android-arm64 $PREFIX/bin/vault
+$ curl -LO https://.../vault-linux-arm64
+$ chmod +x vault-linux-arm64 && mv vault-linux-arm64 $PREFIX/bin/vault
 \end{shell}
 
 \section{Did it work?}
@@ -299,24 +301,28 @@ Run \cmd{vault help}. You should see the full command list:
 
 \section{Building it yourself}
 
-Prefer to build from source? You need Go 1.26.6 or newer. Then:
+Prefer to build from source? You need Rust, through \cmd{rustup}, which
+fetches the exact compiler version the project pins. Then:
 
 \begin{shell}
-$ go build .          # just your platform, produces ./vault
-$ ./build.sh          # every platform, into ./dist, with SHA256SUMS
+$ cargo build --release --locked   # just your platform: target/release/vault
+$ ./build.sh                       # every platform it can, into ./dist, with SHA256SUMS
 \end{shell}
 
-\cmd{build.sh} cross-compiles every target Go supports without C libraries.
+\cmd{build.sh} cross-compiles Linux and Windows with \cmd{cargo-zigbuild}
+and \cmd{zig}, macOS on a Mac, and FreeBSD with \cmd{cross} and Docker; it says which targets your machine can't build.
 32-bit ARM Linux gets two builds, armv6 and armv7. Want just a few? Set
 \env{TARGETS}. Want them somewhere else? Set \env{OUT}.
 
 \shot{build}{A partial build, followed by checking every binary against SHA256SUMS}
 
 \begin{whyso}
-The binaries are \emph{static} and \emph{reproducible}: no C code, no system
-libraries, file paths stripped, build IDs zeroed. Two people building the same
-commit get byte-identical files, so you can check a release against your own
-build.
+The Linux binaries are \emph{static}: they need no system libraries at all.
+Every build uses the pinned compiler and the locked versions of every
+dependency, with build paths stripped, so the result doesn't depend on whose
+machine or which folder built it. Built with the same compiler for the same
+target, the same commit should give the same file, so you can check a
+release against your own build.
 \end{whyso}
 
 \begin{pocket}
@@ -324,7 +330,7 @@ build.
   \item One file per platform. Rename it \cmd{vault} and put it on your \env{PATH}.
   \item Always check the SHA-256 against \file{SHA256SUMS}.
   \item macOS: clear the quarantine flag after checking.
-  \item \cmd{./build.sh} builds all 43 platform binaries from source.
+  \item \cmd{./build.sh} builds every platform your machine can, from source.
 \end{pocketlist}
 \end{pocket}
 
@@ -1071,8 +1077,8 @@ who's slow at typing never blocks you.
 \begin{whyso}
 \textbf{What if vault crashes while holding the lock?} On Linux, macOS, the
 BSDs and Windows, the operating system drops the lock the moment the process
-dies. Nothing to clean up. On Plan~9 and WebAssembly, which have no file
-locks, vault uses a \file{.lock} file instead. If one's ever left behind,
+dies. Nothing to clean up. Older Go builds of vault use the very same locks,
+so mixing versions is safe. If one's ever left behind,
 vault tells you after a minute exactly which file to delete.
 \end{whyso}
 
@@ -1326,7 +1332,16 @@ could not read passphrase (set VAULT\_PASSPHRASE\ldots) & No terminal to ask on,
 agent did not start: \ldots & \cmd{unlock} couldn't start its helper. The reason follows; commands still work, asking for the passphrase. \\
 nothing was unlocked & \cmd{vault lock} found nothing to lock. Not an error. \\
 waiting for another vault process to finish & Not an error. Another command is writing; this one continues when it's done. \\
-vault still locked after a minute\ldots & Plan~9 and WebAssembly only. If nothing else is running, delete the file it names. \\
+cannot lock the vault: \ldots & The lock file couldn't be opened or locked; the reason follows. Check the vault folder's permissions. \\
+\ldots\ changed while being added & The file was being written while vault read it. Nothing was stored; try again when it's finished. \\
+\ldots\ changed after it was stored; not deleting it & \cmd{migrate} stored the file, but it changed before it could be deleted. The original is kept; the vault has the version it read. \\
+\ldots\ already exists & \cmd{get} never overwrites, not even a symlink. Pick another name with \cmd{-o}. \\
+\ldots\ refusing to extract through it & \cmd{get -r} found a symlink (or a file) where a folder should be inside the output folder, and stopped rather than follow it. \\
+cannot lock agent memory \ldots, cannot make the agent undumpable \ldots & \cmd{unlock}'s helper couldn't protect the key in memory, so it refused it. Commands still work, asking for the passphrase. \\
+vault unlock is not supported on this platform\ldots & Windows: every command asks for the passphrase. \\
+download exceeds \ldots\ bytes & A download passed its size limit. Raise it with \cmd{--max-bytes} if you meant it. \\
+redirected to another host: \ldots & \cmd{mirror} only follows redirects within the site it is copying. \\
+mirror incomplete: stored \ldots, skipped \ldots & Some pages failed; the reasons were printed as they happened. Exit status 3. \\
 skipping unreadable record \ldots & A catalogue entry is damaged. Everything else still works; restore \file{records/} from backup to recover that file. \\
 object does not match its catalogue record & The encrypted contents were swapped or damaged. Nothing was written. Restore \file{objects/} from backup. \\
 object size does not match its catalogue record & Same as above: damage or tampering, caught before any output appeared. \\

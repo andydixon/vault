@@ -1,0 +1,57 @@
+[package]
+name = "vault"
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+description = "Post-quantum encrypted file vault with a decoy passphrase"
+homepage = "https://dixon.cx/vault"
+repository = "https://github.com/andydixon/vault"
+publish = false
+
+[dependencies]
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize", "parallel"] }
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc", "zeroize"] }
+hkdf = "0.13"
+hmac = { version = "0.13", features = ["zeroize"] }
+sha2 = { version = "0.11", default-features = false, features = ["zeroize"] }
+sha3 = { version = "0.11", default-features = false, features = ["zeroize"] }
+ml-kem = { version = "0.3.2", features = ["zeroize", "hazmat"] }
+zeroize = { version = "1.9", features = ["derive", "serde"] }
+getrandom = "0.4"
+base64 = "0.23"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jiff = "0.2"
+tar = { version = "0.4.46", default-features = false }
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+ureq = { version = "3.4", default-features = false, features = ["rustls", "platform-verifier", "gzip"] }
+
+[dev-dependencies]
+aes = "0.9"
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1.5", features = ["fs", "process", "mm", "termios", "event", "net", "stdio", "param"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Memory", "Win32_Security"] }
+
+# Tests run the real KEMs and Argon2id; unoptimised they are far too slow.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+[[bench]]
+name = "micro"
+harness = false
+
+[[bench]]
+name = "aead_probe"
+harness = false
