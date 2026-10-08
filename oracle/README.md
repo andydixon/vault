@@ -9,12 +9,14 @@ binary contain no Go code and need no Go toolchain.
 
 Provenance:
 
-- Every file under `oracle/go` is byte-identical to the same path at the
-  repository root at `4c1507c`, except the three added test files below.
-- `oracle_vectors_test.go`, `internal/pqcrypt/oracle_vectors_test.go` and
-  `internal/stream/oracle_vectors_test.go` are test-only generators. They
-  call the frozen code and write what it computes; they skip themselves
-  unless `VAULT_ORACLE_OUT` is set, and add nothing to the oracle binary.
+- All 32 Go sources and `go.mod`/`go.sum` under `oracle/go` are
+  byte-identical to the same paths at the repository root at `4c1507c`.
+- The only additions are test files whose names contain `oracle`
+  (`*oracle_vectors_test.go`, `oracle_decrypt_test.go`,
+  `*oracle_bench_test.go`). They call the frozen code and record what it
+  computes; they skip themselves unless `VAULT_ORACLE_OUT` or
+  `VAULT_ORACLE_DECRYPT` is set (benchmarks run only with `-bench`), and add
+  nothing to the oracle binary.
 - Dependencies are pinned by `go.mod`/`go.sum`: CIRCL v1.6.4,
   golang.org/x/crypto v0.53.0, x/sys v0.46.0, x/term v0.44.0. The module
   needs Go 1.26.6 or newer.
@@ -22,7 +24,9 @@ Provenance:
 Check the copy is still faithful:
 
 ```sh
-git diff --stat 4c1507c HEAD -M -- oracle/go   # renames only, plus the generators
+for f in $(git ls-tree -r --name-only 4c1507c | grep -E '\.go$|^go\.(mod|sum)$'); do
+	cmp <(git show 4c1507c:$f) oracle/go/$f || echo "DIFFERS: $f"
+done
 ```
 
 Use:
