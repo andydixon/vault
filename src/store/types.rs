@@ -323,7 +323,7 @@ mod tests {
             let text = r["json"].as_str().unwrap();
             assert_eq!(
                 &enc[..],
-                text["{\"name\":".len()..text.find(",\"seed\"").unwrap()].as_bytes(),
+                &text.as_bytes()["{\"name\":".len()..text.find(",\"seed\"").unwrap()],
                 "escaping of {n:?}"
             );
             if VaultName::new(n).is_none() {

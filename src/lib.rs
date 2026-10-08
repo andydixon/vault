@@ -15,3 +15,4 @@ pub mod rng;
 pub mod secret;
 pub mod store;
 pub mod util;
+pub mod net;

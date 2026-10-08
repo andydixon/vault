@@ -765,7 +765,7 @@ fn write_filler(root: &Path, target: u64, pool: Arc<Pool>, entropy: Entropy) -> 
     let mut rng = entropy.rng(b"filler");
     let throwaway = Identity::generate(&mut rng);
     let s = Store::new(root, throwaway, pool, true, entropy);
-    let upper = (target / 8).max(CHUNK_SIZE).min(1 << 30) as f64;
+    let upper = (target / 8).clamp(CHUNK_SIZE, 1 << 30) as f64;
     let count = FILLER_MIN + rng.below(FILLER_MAX - FILLER_MIN + 1);
     let mut cat = Catalogue::default();
     let (mut i, mut total) = (0u64, 0u64);
