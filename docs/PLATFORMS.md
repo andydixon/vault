@@ -51,8 +51,8 @@ disables core dumps. See `SECURITY.md`.
    on Linux cross-builds macOS with `--no-default-features`: those binaries
    verify TLS for `add URL` and `mirror` against the bundled Mozilla roots
    instead of the macOS keychain (so a corporate CA added to the keychain is
-   not trusted). Built on a Mac, or through Homebrew
-   (`brew install andydixon/tap/vault`), they use the keychain.
+   not trusted). Built on a Mac (`cargo build --release`), vault uses the
+   keychain.
 
 ## No longer released
 

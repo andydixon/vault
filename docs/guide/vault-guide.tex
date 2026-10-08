@@ -1332,6 +1332,17 @@ could not read passphrase (set VAULT\_PASSPHRASE\ldots) & No terminal to ask on,
 agent did not start: \ldots & \cmd{unlock} couldn't start its helper. The reason follows; commands still work, asking for the passphrase. \\
 nothing was unlocked & \cmd{vault lock} found nothing to lock. Not an error. \\
 waiting for another vault process to finish & Not an error. Another command is writing; this one continues when it's done. \\
+skipping unreadable record \ldots & A catalogue entry is damaged. Everything else still works; restore \file{records/} from backup to recover that file. \\
+object does not match its catalogue record & The encrypted contents were swapped or damaged. Nothing was written. Restore \file{objects/} from backup. \\
+object size does not match its catalogue record & Same as above: damage or tampering, caught before any output appeared. \\
+cannot find home directory; set VAULT\_KEY & Unusual environments only. Set \env{VAULT\_KEY} and \env{VAULT\_DIR}. \\
+unknown command / wrong number of arguments & A typo in the command itself. The usage text follows. \\
+\end{vtable}
+
+\subsection{Files, the lock and downloads}
+
+\begin{vtable}{>{\ttfamily\footnotesize}p{58mm}Y}
+\thead{MESSAGE} & \thead{WHAT IT MEANS, AND THE FIX} \\ \midrule
 cannot lock the vault: \ldots & The lock file couldn't be opened or locked; the reason follows. Check the vault folder's permissions. \\
 \ldots\ changed while being added & The file was being written while vault read it. Nothing was stored; try again when it's finished. \\
 \ldots\ changed after it was stored; not deleting it & \cmd{migrate} stored the file, but it changed before it could be deleted. The original is kept; the vault has the version it read. \\
@@ -1342,11 +1353,6 @@ vault unlock is not supported on this platform\ldots & Windows: every command as
 download exceeds \ldots\ bytes & A download passed its size limit. Raise it with \cmd{--max-bytes} if you meant it. \\
 redirected to another host: \ldots & \cmd{mirror} only follows redirects within the site it is copying. \\
 mirror incomplete: stored \ldots, skipped \ldots & Some pages failed; the reasons were printed as they happened. Exit status 3. \\
-skipping unreadable record \ldots & A catalogue entry is damaged. Everything else still works; restore \file{records/} from backup to recover that file. \\
-object does not match its catalogue record & The encrypted contents were swapped or damaged. Nothing was written. Restore \file{objects/} from backup. \\
-object size does not match its catalogue record & Same as above: damage or tampering, caught before any output appeared. \\
-cannot find home directory; set VAULT\_KEY & Unusual environments only. Set \env{VAULT\_KEY} and \env{VAULT\_DIR}. \\
-unknown command / wrong number of arguments & A typo in the command itself. The usage text follows. \\
 \end{vtable}
 
 \section{``My files have vanished!''}
