@@ -68,21 +68,20 @@ jobs:
         run: |
           rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl i686-unknown-linux-musl \
             arm-unknown-linux-musleabihf armv7-unknown-linux-musleabihf riscv64gc-unknown-linux-musl \
-            loongarch64-unknown-linux-musl powerpc64le-unknown-linux-musl powerpc64-unknown-linux-gnu \
-            s390x-unknown-linux-gnu x86_64-pc-windows-gnu i686-pc-windows-gnu aarch64-pc-windows-gnullvm wasm32-wasip1 \
-            x86_64-unknown-freebsd i686-unknown-freebsd x86_64-unknown-netbsd x86_64-unknown-illumos x86_64-pc-solaris
+            loongarch64-unknown-linux-musl powerpc64le-unknown-linux-musl \
+            s390x-unknown-linux-gnu x86_64-pc-windows-gnu i686-pc-windows-gnu aarch64-pc-windows-gnullvm \
+            x86_64-unknown-freebsd i686-unknown-freebsd
       - name: build
         run: |
           # Everything but macOS, which the test job builds on a Mac.
           TARGETS="linux/amd64 linux/arm64 linux/386 linux/armv6 linux/armv7 linux/riscv64 linux/loong64 \
-            linux/ppc64le linux/ppc64 linux/s390x android/arm64 windows/amd64 windows/386 windows/arm64 \
-            freebsd/amd64 freebsd/386 netbsd/amd64 illumos/amd64 solaris/amd64 wasip1/wasm" ./build.sh
+            linux/ppc64le linux/s390x windows/amd64 windows/386 windows/arm64 freebsd/amd64 freebsd/386" ./build.sh
       - name: run builds under qemu, cross-checked with the Go oracle
         run: |
-          sudo apt-get update -q && sudo apt-get install -yq qemu-user libc6-s390x-cross libc6-ppc64-cross
+          sudo apt-get update -q && sudo apt-get install -yq qemu-user libc6-s390x-cross
           (cd oracle/go && go build -o ../../target/vault-go .)
           for t in "arm64 qemu-aarch64" "armv7 qemu-arm" "riscv64 qemu-riscv64" "ppc64le qemu-ppc64le" \
-                   "s390x qemu-s390x -L /usr/s390x-linux-gnu" "ppc64 qemu-ppc64 -L /usr/powerpc64-linux-gnu"; do
+                   "s390x qemu-s390x -L /usr/s390x-linux-gnu"; do
             EMU="${t#* }" scripts/smoke.sh "dist/vault-linux-${t%% *}" target/vault-go
           done
       - uses: actions/upload-artifact@v4

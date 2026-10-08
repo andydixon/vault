@@ -221,16 +221,15 @@ Linux PC or server & almost everything & vault-linux-amd64 \\
 Linux on ARM64 & Pi 4/5 (64-bit OS), Graviton, Ampere & vault-linux-arm64 \\
 Raspberry Pi, 32-bit & Pi 2, 3, 4 on a 32-bit OS & vault-linux-armv7 \\
 Raspberry Pi Zero / 1 & the tiny older ones & vault-linux-armv6 \\
-Android & in Termux & vault-android-arm64 \\
-FreeBSD, NetBSD & amd64 (FreeBSD also 386) & vault-freebsd-amd64 etc. \\
-Something exotic & RISC-V, POWER, s390x, LoongArch, illumos, Solaris & see \cmd{dist/} \\
+Android & in Termux: the Linux ARM64 file & vault-linux-arm64 \\
+FreeBSD & amd64 or 386 & vault-freebsd-amd64 etc. \\
+Something exotic & RISC-V, POWER (little-endian), s390x, LoongArch & see \cmd{dist/} \\
 \end{vtable}
 
 \begin{squirrel}
-The release covers some twenty platforms, from Windows on ARM to IBM
-mainframes, and even WebAssembly. A few that the older Go builds reached,
-such as Plan~9, OpenBSD and MIPS, have no stable Rust toolchain yet;
-\file{docs/PLATFORMS.md} keeps the list. Will you ever need
+The release covers sixteen builds for Linux, Windows, macOS and FreeBSD,
+from Windows on ARM to IBM mainframes. The older Go builds reached further,
+to Plan~9 and WebAssembly; \file{docs/PLATFORMS.md} says why those went. Will you ever need
 \file{vault-linux-s390x}? Almost certainly not. Is it pleasing that it
 exists? Extremely.
 \end{squirrel}
@@ -290,8 +289,8 @@ so Gatekeeper quarantines it. Once you've checked the SHA-256, clear the flag:
 
 \subsection{Android (Termux)}
 \begin{shell}
-$ curl -LO https://.../vault-android-arm64
-$ chmod +x vault-android-arm64 && mv vault-android-arm64 $PREFIX/bin/vault
+$ curl -LO https://.../vault-linux-arm64
+$ chmod +x vault-linux-arm64 && mv vault-linux-arm64 $PREFIX/bin/vault
 \end{shell}
 
 \section{Did it work?}
@@ -311,8 +310,7 @@ $ ./build.sh                       # every platform it can, into ./dist, with SH
 \end{shell}
 
 \cmd{build.sh} cross-compiles Linux and Windows with \cmd{cargo-zigbuild}
-and \cmd{zig}, macOS on a Mac, and the BSDs, illumos and Solaris with
-\cmd{cross} and Docker; it says which targets your machine can't build.
+and \cmd{zig}, macOS on a Mac, and FreeBSD with \cmd{cross} and Docker; it says which targets your machine can't build.
 32-bit ARM Linux gets two builds, armv6 and armv7. Want just a few? Set
 \env{TARGETS}. Want them somewhere else? Set \env{OUT}.
 
@@ -1080,8 +1078,7 @@ who's slow at typing never blocks you.
 \textbf{What if vault crashes while holding the lock?} On Linux, macOS, the
 BSDs and Windows, the operating system drops the lock the moment the process
 dies. Nothing to clean up. Older Go builds of vault use the very same locks,
-so mixing versions is safe. On WebAssembly, which has no file locks, vault
-uses a \file{.lock} file instead. If one's ever left behind,
+so mixing versions is safe. If one's ever left behind,
 vault tells you after a minute exactly which file to delete.
 \end{whyso}
 
@@ -1335,7 +1332,6 @@ could not read passphrase (set VAULT\_PASSPHRASE\ldots) & No terminal to ask on,
 agent did not start: \ldots & \cmd{unlock} couldn't start its helper. The reason follows; commands still work, asking for the passphrase. \\
 nothing was unlocked & \cmd{vault lock} found nothing to lock. Not an error. \\
 waiting for another vault process to finish & Not an error. Another command is writing; this one continues when it's done. \\
-vault still locked after a minute\ldots & WebAssembly only. If nothing else is running, delete the file it names. \\
 cannot lock the vault: \ldots & The lock file couldn't be opened or locked; the reason follows. Check the vault folder's permissions. \\
 \ldots\ changed while being added & The file was being written while vault read it. Nothing was stored; try again when it's finished. \\
 \ldots\ changed after it was stored; not deleting it & \cmd{migrate} stored the file, but it changed before it could be deleted. The original is kept; the vault has the version it read. \\

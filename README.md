@@ -37,7 +37,7 @@ TARGETS="linux/amd64 windows/amd64" ./build.sh
 
 `build.sh` cross-compiles with `cargo-zigbuild` and `zig` (Linux, statically
 linked with musl, and Windows), on a Mac for macOS, and with `cross` and
-Docker for the BSDs, illumos and Solaris. It names binaries as before
+Docker for FreeBSD. The release covers Linux, Windows, macOS and FreeBSD. It names binaries as before
 (`vault-linux-arm64`, `vault-windows-amd64.exe`, …), builds 32-bit ARM Linux
 for both armv6 and armv7, and writes `dist/SHA256SUMS`. `docs/PLATFORMS.md`
 lists every target, how it is built and tested, and the Go targets Rust
@@ -103,9 +103,7 @@ Commands that change the vault take an exclusive lock on `DIR/.lock`, and
 commands that read it take a shared one. A second process waits, and says
 so, until the first finishes. The operating system releases the lock if a
 process dies; the locks are the same ones the Go version used, so old and
-new versions exclude each other. WebAssembly (WASI) has no file locks, so
-there the lock file itself is the lock. After a crash there you remove it
-by hand; the error message names it.
+new versions exclude each other.
 
 Adding a name that already exists replaces it. `get` never replaces an
 existing file (or symlink) and writes nothing until the whole file has

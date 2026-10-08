@@ -92,8 +92,8 @@ Command line:
 - `ls`/`list` piped into a reader that stops early end quietly with
   status 141, as Go's did by `SIGPIPE`.
 
-Platforms: see `PLATFORMS.md`. Some targets Go built have no stable Rust
-equivalent; they are listed there and need a decision before release.
+Platforms: releases now cover Linux, Windows, macOS and FreeBSD (16
+binaries, down from 43); `PLATFORMS.md` lists what was dropped and why.
 
 ## Unchanged on purpose
 
