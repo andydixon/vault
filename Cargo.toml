@@ -10,7 +10,7 @@ repository = "https://github.com/andydixon/vault"
 publish = false
 
 [dependencies]
-argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize", "parallel"] }
 chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc", "zeroize"] }
 hkdf = "0.13"
 hmac = { version = "0.13", features = ["zeroize"] }
@@ -43,4 +43,8 @@ strip = true
 
 [[bench]]
 name = "micro"
+harness = false
+
+[[bench]]
+name = "aead_probe"
 harness = false
