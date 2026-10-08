@@ -10,4 +10,5 @@ cd "$(dirname "$0")/.."
 out=$PWD/tests/vectors
 mkdir -p "$out"
 (cd oracle/go && VAULT_ORACLE_OUT=$out go test -count=1 -run '^TestOracleVectors$' ./ ./internal/pqcrypt ./internal/stream)
+(cd oracle/go && VAULT_ORACLE_OUT=$out go test -count=1 -run '^TestOracleNetVectors$' ./)
 echo "vectors written to $out"
