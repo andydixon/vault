@@ -14,7 +14,9 @@
 #
 # How each target is built, and what the host needs:
 #   zig    cargo-zigbuild and zig on PATH  (Linux, Windows GNU ABI)
-#   mac    a Mac with Xcode                (macOS)
+#   mac    a Mac with Xcode, or zig        (macOS; zig builds trust the
+#                                            bundled Mozilla roots, not the
+#                                            keychain)
 #   cross  `cross` and Docker               (FreeBSD)
 # A requested target the host cannot build is reported, the others are still
 # built, and the script exits non-zero. See docs/PLATFORMS.md for the Go
@@ -98,8 +100,16 @@ build_one() {
 			{ echo "SKIPPED $want: needs cargo-zigbuild and zig" >&2; return 1; }
 		cmd=(cargo zigbuild) ;;
 	mac)
-		[[ $HOST_OS == Darwin ]] || { echo "SKIPPED $want: needs a Mac with Xcode" >&2; return 1; }
-		cmd=(cargo build) ;;
+		if [[ $HOST_OS == Darwin ]]; then
+			cmd=(cargo build)
+		elif command -v cargo-zigbuild >/dev/null && command -v zig >/dev/null; then
+			# Without Apple's SDK there is no Security framework to link, so
+			# the cross-built binary trusts the bundled Mozilla roots rather
+			# than the macOS keychain.
+			cmd=(cargo zigbuild --no-default-features)
+		else
+			echo "SKIPPED $want: needs a Mac, or cargo-zigbuild and zig" >&2; return 1
+		fi ;;
 	cross)
 		command -v cross >/dev/null && command -v docker >/dev/null ||
 			{ echo "SKIPPED $want: needs cross and docker" >&2; return 1; }
