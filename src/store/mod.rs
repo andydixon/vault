@@ -214,11 +214,10 @@ impl Store {
             }
             let sp = dir.join(&shard.0);
             for (name, _) in sorted_dir(&sp)? {
-                if let Some(id) = name.to_str().and_then(Id::parse) {
-                    if id.shard() == shard.0.to_string_lossy() {
+                if let Some(id) = name.to_str().and_then(Id::parse)
+                    && id.shard() == shard.0.to_string_lossy() {
                         ids.push(id);
                     }
-                }
             }
         }
         let mut cat = Catalogue::default();
@@ -337,12 +336,11 @@ impl Store {
         let mut first_err: Option<Error> = None;
         let mut remaining = size;
         for i in 0..object_count(size) {
-            if pending.len() == OBJECT_BUFFERS {
-                if let Err(e) = pending.pop_front().expect("non-empty").wait().map_err(Error::new).and_then(|r| r) {
+            if pending.len() == OBJECT_BUFFERS
+                && let Err(e) = pending.pop_front().expect("non-empty").wait().map_err(Error::new).and_then(|r| r) {
                     first_err = Some(e);
                     break;
                 }
-            }
             let id = seed.object_id(i);
             let part = remaining.min(CHUNK_DATA) as usize;
             remaining -= part as u64;
@@ -558,7 +556,7 @@ impl Inner {
         let dst = self.path(dir, id);
         let shard = dst.parent().expect("sharded path").to_path_buf();
         let (mut f, tmp) = pfs::create_temp(&shard, ".pending-").map_err(|e| Error::io("open", &shard, &e))?;
-        let mut ct = Vec::with_capacity(plaintext.len() + 32 << 10);
+        let mut ct = Vec::with_capacity(plaintext.len() + (32 << 10));
         fury::encrypt_to(&mut ct, &self.recipient, plaintext, &mut self.entropy.rng(&id.0));
         let r = (|| -> Result<()> {
             f.write_all(&ct).map_err(|e| Error::io("write", &tmp, &e))?;

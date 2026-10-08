@@ -99,7 +99,7 @@ pub fn hex(b: &[u8]) -> String {
 
 pub fn parse_hex(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
-    if b.len() % 2 != 0 {
+    if !b.len().is_multiple_of(2) {
         return None;
     }
     let v = |c: u8| match c {
