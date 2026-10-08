@@ -226,6 +226,19 @@ mod imp {
         }
     }
 
+    fn read_fd0(buf: &mut [u8]) -> std::io::Result<()> {
+        let mut done = 0;
+        while done < buf.len() {
+            match rustix::io::read(rustix::stdio::stdin(), &mut buf[done..]) {
+                Ok(0) => return Err(std::io::ErrorKind::UnexpectedEof.into()),
+                Ok(n) => done += n,
+                Err(rustix::io::Errno::INTR) => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(())
+    }
+
     /// The agent process. Returns when it expires or is told to quit.
     pub fn run(sock: &Path, ttl: &str, mode: &str) {
         let mut out = std::io::stdout();
@@ -249,7 +262,9 @@ mod imp {
             Ok(b) => b,
             Err(e) => return report(&mut out, &e.to_string()),
         };
-        if std::io::stdin().lock().read_exact(secret.as_mut_slice()).is_err() {
+        // Read straight from fd 0 into the locked page: std's buffered
+        // stdin would leave a copy in ordinary heap memory.
+        if read_fd0(secret.as_mut_slice()).is_err() {
             return report(&mut out, "no key received");
         }
         {
@@ -258,8 +273,12 @@ mod imp {
                 return report(&mut out, &e);
             }
         }
-        // A socket left by an agent that died stops bind; start has already
-        // stopped any live one.
+        // A socket left by an agent that died stops bind. Remove it only if
+        // nothing answers on it, so a concurrent unlock's live agent is not
+        // cut off from `vault lock`.
+        if UnixStream::connect(sock).is_ok() {
+            return report(&mut out, "another agent is already running for this key");
+        }
         let _ = std::fs::remove_file(sock);
         let l = match UnixListener::bind(sock) {
             Ok(l) => l,

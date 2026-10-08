@@ -256,6 +256,15 @@ fn migrate_deletes_only_stored_originals() {
     // Never the vault or the key.
     let o = e.run(RUST, Some(REAL), &["add", "store"]);
     assert!(String::from_utf8_lossy(&o.stderr).contains("is the vault or its key"));
+    // Nor anything inside the vault: migrating its records would delete them.
+    let before = e.names(RUST, REAL);
+    let o = e.run(RUST, Some(REAL), &["migrate", "--yes", "store/records"]);
+    assert!(
+        String::from_utf8_lossy(&o.stderr).contains("is inside the vault"),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert_eq!(e.names(RUST, REAL), before);
 }
 
 #[cfg(unix)]

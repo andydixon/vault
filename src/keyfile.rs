@@ -124,49 +124,102 @@ pub fn encode_pem(body: &[u8]) -> String {
 }
 
 /// The block body if `data` is one `VAULT KEY` PEM block, optionally with
-/// text before it (as Go's `pem.Decode` allows) and only whitespace after.
+/// text before it and only whitespace after: a port of Go's `pem.Decode`
+/// followed by vault's checks on its result.
 pub fn decode_pem(data: &[u8]) -> Option<Vec<u8>> {
-    let begin = format!("-----BEGIN {PEM_TYPE}-----");
-    let end = format!("-----END {PEM_TYPE}-----");
-    let start = if data.starts_with(b"-----BEGIN ") {
-        0
-    } else {
-        find(data, b"\n-----BEGIN ")? + 1
-    };
-    let mut lines = data[start..].split_inclusive(|&c| c == b'\n');
-    let first = lines.next()?;
-    if trim_right(first) != begin.as_bytes() {
+    let (typ, body, rest) = go_pem_decode(data)?;
+    if typ != PEM_TYPE.as_bytes() || !go_trim_space(rest).is_empty() {
         return None;
     }
-    let mut b64 = Vec::new();
-    let mut after = None;
-    let mut consumed = start + first.len();
-    for line in lines.by_ref() {
-        consumed += line.len();
-        let t = trim_right(line);
-        if t == end.as_bytes() {
-            after = Some(consumed);
-            break;
-        }
-        if t.contains(&b':') {
-            // A PEM header line; Go accepts and ignores them.
-            continue;
-        }
-        b64.extend(t.iter().filter(|c| !matches!(c, b' ' | b'\t')));
-    }
-    let after = after?;
-    if !data[after..].iter().all(|c| c.is_ascii_whitespace()) {
-        return None;
-    }
-    base64::engine::general_purpose::STANDARD.decode(&b64).ok()
+    Some(body)
 }
 
-fn trim_right(l: &[u8]) -> &[u8] {
-    let mut e = l.len();
-    while e > 0 && matches!(l[e - 1], b' ' | b'\t' | b'\r' | b'\n') {
-        e -= 1;
+/// Go's `getLine`: up to the next LF (dropping one CR before it), with
+/// trailing spaces and tabs removed, and the rest after the LF.
+fn get_line(data: &[u8]) -> (&[u8], &[u8]) {
+    let (mut i, j) = match data.iter().position(|&c| c == b'\n') {
+        Some(i) => (i, i + 1),
+        None => (data.len(), data.len()),
+    };
+    if j > i && i > 0 && data[i - 1] == b'\r' {
+        i -= 1;
     }
-    &l[..e]
+    let mut line = &data[..i];
+    while let [rest @ .., b' ' | b'\t'] = line {
+        line = rest;
+    }
+    (line, &data[j..])
+}
+
+/// Go's `bytes.TrimSpace` (Unicode white space in UTF-8 text).
+fn go_trim_space(b: &[u8]) -> &[u8] {
+    match std::str::from_utf8(b) {
+        Ok(s) => s.trim_matches(char::is_whitespace).as_bytes(),
+        Err(_) => b.trim_ascii(),
+    }
+}
+
+/// Go's `encoding/pem.Decode`: the first well-formed block's type, bytes
+/// and the data after it. Malformed candidates are skipped, as in Go.
+fn go_pem_decode(data: &[u8]) -> Option<(Vec<u8>, Vec<u8>, &[u8])> {
+    const START: &[u8] = b"\n-----BEGIN ";
+    const END: &[u8] = b"\n-----END ";
+    const EOL: &[u8] = b"-----";
+    let mut rest = data;
+    loop {
+        if rest.starts_with(&START[1..]) {
+            rest = &rest[START.len() - 1..];
+        } else if let Some(i) = find(rest, START) {
+            rest = &rest[i + START.len()..];
+        } else {
+            return None;
+        }
+        let (type_line, r) = get_line(rest);
+        rest = r;
+        let Some(typ) = type_line.strip_suffix(EOL) else { continue };
+        let mut headers = 0;
+        loop {
+            if rest.is_empty() {
+                return None;
+            }
+            let (line, next) = get_line(rest);
+            if !line.contains(&b':') {
+                break;
+            }
+            headers += 1;
+            rest = next;
+        }
+        let (end_index, trailer_index) = if headers == 0 && rest.starts_with(&END[1..]) {
+            (0, END.len() - 1)
+        } else {
+            match find(rest, END) {
+                Some(i) => (i, i + END.len()),
+                None => continue,
+            }
+        };
+        let trailer = &rest[trailer_index..];
+        let tlen = typ.len() + EOL.len();
+        if trailer.len() < tlen {
+            continue;
+        }
+        let (t, rest_of_end) = trailer.split_at(tlen);
+        if !t.starts_with(typ) || !t.ends_with(EOL) || !get_line(rest_of_end).0.is_empty() {
+            continue;
+        }
+        // Go's StdEncoding skips CR and LF; removeSpacesAndTabs drops the rest.
+        let b64: Vec<u8> = rest[..end_index]
+            .iter()
+            .copied()
+            .filter(|c| !matches!(c, b' ' | b'\t' | b'\r' | b'\n'))
+            .collect();
+        let lenient = base64::engine::GeneralPurpose::new(
+            &base64::alphabet::STANDARD,
+            base64::engine::GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true),
+        );
+        let Ok(bytes) = lenient.decode(&b64) else { continue };
+        let after = get_line(&rest[end_index + END.len() - 1..]).1;
+        return Some((typ.to_vec(), bytes, after));
+    }
 }
 
 fn find(h: &[u8], n: &[u8]) -> Option<usize> {
@@ -327,6 +380,27 @@ mod tests {
         assert!(decode_pem(format!("{pem}x").as_bytes()).is_none());
         assert!(decode_pem(pem.replace("VAULT KEY", "VAULT KEX").as_bytes()).is_none());
         assert!(decode_pem(pem.replace("-----END", "-----FIN").as_bytes()).is_none());
+        // Cases where an earlier, simpler parser differed from Go's pem.Decode.
+        // (In the second body line: a colon in the first makes it a header.)
+        let first = pem.find('\n').unwrap();
+        let mid = first + 1 + pem[first + 1..].find('\n').unwrap() + 30;
+        assert!(
+            decode_pem(format!("{}:{}", &pem[..mid], &pem[mid..]).as_bytes()).is_none(),
+            "colon inside the body"
+        );
+        assert!(
+            decode_pem(format!("{pem}\u{b}\u{a0}").as_bytes()).is_some(),
+            "Unicode space after the block"
+        );
+        assert!(decode_pem(pem.replacen("\n", "\r\n", 3).as_bytes()).is_some(), "CRLF lines");
+        assert!(
+            decode_pem(format!("-----BEGIN X\n{pem}").as_bytes()).is_some(),
+            "a bad BEGIN line before the block"
+        );
+        assert!(
+            decode_pem(format!("-----BEGIN VAULT KEY-----\nProc-Type: 4,x\n\n{}", &pem[26..]).as_bytes()).is_some(),
+            "headers"
+        );
         let mut short = body.clone();
         short.pop();
         assert_eq!(parse_body(&short).err(), Some(Error::NotAKeyFile));

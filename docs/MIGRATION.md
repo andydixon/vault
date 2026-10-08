@@ -23,6 +23,14 @@ Safety and correctness:
   use, see `SECURITY.md`.)
 - **Extracted files are synced** to disk before they appear under their
   name, and their directory afterwards.
+- **`get` needs an atomic no-replace primitive.** On a filesystem with
+  neither `RENAME_NOREPLACE` nor hard links (some FUSE mounts, FAT) it fails
+  with a message saying so, where Go would rename.
+- **`add`/`migrate` refuse paths inside the vault directory** (Go refused
+  only the directory itself; `migrate store/records` would have deleted the
+  vault's records).
+- **`absorb` refuses GNU sparse files** (Go expanded them), and honours PAX
+  size records as Go does.
 - **A source file that changes while being added is not stored.** If it
   grows, shrinks, is modified or replaced during `add`/`migrate`, the
   command fails and nothing is stored. Go stored whatever it read (for a

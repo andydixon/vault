@@ -165,10 +165,33 @@ fn publish_inner(tmp: &Path, dst: &Path) -> io::Result<()> {
 /// atomic no-clobber publish wherever hard links work.
 #[cfg(not(windows))]
 fn link_publish(tmp: &Path, dst: &Path) -> io::Result<()> {
-    std::fs::hard_link(tmp, dst)?;
-    // The data is safely at dst; a failure to drop the temporary name is
-    // reported but dst stays.
-    std::fs::remove_file(tmp)
+    std::fs::hard_link(tmp, dst).map_err(no_atomic)?;
+    // The data is safely at dst; failing to drop the temporary name is only
+    // worth a warning.
+    if let Err(e) = std::fs::remove_file(tmp) {
+        eprintln!(
+            "vault: could not remove temporary file {}: {}",
+            tmp.display(),
+            crate::util::io_reason(&e)
+        );
+    }
+    Ok(())
+}
+
+/// A filesystem with neither RENAME_NOREPLACE nor hard links cannot publish
+/// without risking a replace; say so rather than fall back.
+#[cfg(not(windows))]
+fn no_atomic(e: io::Error) -> io::Error {
+    if e.kind() == io::ErrorKind::AlreadyExists {
+        return e;
+    }
+    io::Error::new(
+        e.kind(),
+        format!(
+            "this filesystem offers no atomic no-replace rename or hard link ({})",
+            crate::util::io_reason(&e)
+        ),
+    )
 }
 
 #[cfg(windows)]
@@ -325,9 +348,11 @@ impl Dir {
             match linkat(&self.fd, tmp, &self.fd, name, AtFlags::empty()) {
                 Ok(()) => {}
                 Err(rustix::io::Errno::EXIST) => return Err(exists_error(&dst)),
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(no_atomic(e.into())),
             }
-            unlinkat(&self.fd, tmp, AtFlags::empty())?;
+            if let Err(e) = unlinkat(&self.fd, tmp, AtFlags::empty()) {
+                eprintln!("vault: could not remove temporary file {}: {e}", self.path.join(tmp).display());
+            }
             Ok(())
         }
         #[cfg(not(unix))]
@@ -380,13 +405,27 @@ fn is_reparse(_: &std::fs::Metadata) -> bool {
     false
 }
 
+/// On Windows, also refuse names NTFS would treat specially: alternate
+/// data streams (`a:b`), reserved device names, trailing dots or spaces.
+fn windows_safe(name: &OsStr) -> bool {
+    if !cfg!(windows) {
+        return true;
+    }
+    let Some(n) = name.to_str() else { return false };
+    let stem = n.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || ((stem.starts_with("COM") || stem.starts_with("LPT")) && stem.len() == 4 && stem.as_bytes()[3].is_ascii_digit());
+    !n.contains([':', '<', '>', '"', '|', '?', '*']) && !n.ends_with(['.', ' ']) && !reserved
+}
+
 /// A single, plain path component: no separators, not "." or "..".
 fn check_component(name: &OsStr) -> io::Result<()> {
     let ok = !name.is_empty()
         && name != "."
         && name != ".."
         && Path::new(name).components().count() == 1
-        && matches!(Path::new(name).components().next(), Some(std::path::Component::Normal(_)));
+        && matches!(Path::new(name).components().next(), Some(std::path::Component::Normal(_)))
+        && windows_safe(name);
     if ok {
         Ok(())
     } else {

@@ -122,6 +122,8 @@ pub struct StreamWriter<W: Write> {
     dst: Option<W>,
     buf: Vec<u8>,
     index: u64,
+    /// Set by any failure: like Go's sticky error, every later call fails.
+    failed: bool,
 }
 
 impl<W: Write> StreamWriter<W> {
@@ -131,6 +133,7 @@ impl<W: Write> StreamWriter<W> {
             dst: Some(dst),
             buf: Vec::with_capacity(ENC_CHUNK_SIZE),
             index: 0,
+            failed: false,
         }
     }
 
@@ -141,7 +144,24 @@ impl<W: Write> StreamWriter<W> {
         w
     }
 
+    fn check(&self) -> io::Result<()> {
+        if self.failed {
+            Err(io::Error::other("encrypted stream writer already failed"))
+        } else {
+            Ok(())
+        }
+    }
+
     fn flush_chunk(&mut self, last: bool) -> io::Result<()> {
+        let r = self.seal_and_write(last);
+        if r.is_err() {
+            self.failed = true;
+            self.buf.zeroize();
+        }
+        r
+    }
+
+    fn seal_and_write(&mut self, last: bool) -> io::Result<()> {
         let n = self.buf.len();
         self.buf.resize(n + TAG_SIZE, 0);
         self.cipher.seal(self.index, last, &mut self.buf);
@@ -152,6 +172,7 @@ impl<W: Write> StreamWriter<W> {
     }
 
     pub fn finish(mut self) -> io::Result<W> {
+        self.check()?;
         self.flush_chunk(true)?;
         Ok(self.dst.take().expect("writer in use"))
     }
@@ -159,6 +180,7 @@ impl<W: Write> StreamWriter<W> {
 
 impl<W: Write> Write for StreamWriter<W> {
     fn write(&mut self, mut p: &[u8]) -> io::Result<usize> {
+        self.check()?;
         let total = p.len();
         while !p.is_empty() {
             let take = p.len().min(CHUNK_SIZE - self.buf.len());
@@ -174,6 +196,7 @@ impl<W: Write> Write for StreamWriter<W> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.check()?;
         self.dst.as_mut().expect("writer in use").flush()
     }
 }
@@ -287,8 +310,11 @@ impl<R: Read> StreamReader<R> {
             }
             if raw.len() < ENC_CHUNK_SIZE {
                 // A short first chunk is final; empty is the empty file.
-                let p = self.open(raw, true)?;
-                expect_eof(&mut self.src)?;
+                let mut p = self.open(raw, true)?;
+                if let Err(e) = expect_eof(&mut self.src) {
+                    p.zeroize();
+                    return Err(e);
+                }
                 self.deliver(p);
                 self.done = true;
                 return Ok(());
@@ -307,9 +333,19 @@ impl<R: Read> StreamReader<R> {
             if next.len() == TAG_SIZE {
                 return Err(StreamError::EmptyLastChunk.into());
             }
-            let p = self.open(pending, false)?;
-            let q = self.open(next, true)?;
-            expect_eof(&mut self.src)?;
+            let mut p = self.open(pending, false)?;
+            let mut q = match self.open(next, true) {
+                Ok(q) => q,
+                Err(e) => {
+                    p.zeroize();
+                    return Err(e);
+                }
+            };
+            if let Err(e) = expect_eof(&mut self.src) {
+                p.zeroize();
+                q.zeroize();
+                return Err(e);
+            }
             self.deliver(p);
             self.queued = Some(q);
             self.done = true;
@@ -514,7 +550,8 @@ impl<'a, S: ReadAt + ?Sized> StreamReaderAt<'a, S> {
             ));
         }
         let mut n = 0;
-        let mut chunk = vec![0u8; ENC_CHUNK_SIZE];
+        // Cleared on every exit, early returns included.
+        let mut chunk = zeroize::Zeroizing::new(vec![0u8; ENC_CHUNK_SIZE]);
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
         while n < p.len() && off < self.size {
             let idx = off / CHUNK_SIZE as u64;
@@ -538,7 +575,7 @@ impl<'a, S: ReadAt + ?Sized> StreamReaderAt<'a, S> {
             n += take;
             off += take as u64;
         }
-        chunk.zeroize();
+
         Ok(n)
     }
 }
@@ -748,6 +785,26 @@ pub(crate) mod tests {
         assert!(StreamReaderAt::new(&key, &c[..], c.len() as u64 - 1).is_err());
         assert!(encrypted_chunk_count(15).is_err());
         assert!(encrypted_chunk_count(ENC_CHUNK_SIZE as u64 + 16).is_err());
+    }
+
+    /// After a failed write the writer refuses everything, as Go's does,
+    /// instead of growing past a chunk.
+    #[test]
+    fn writer_failure_is_sticky() {
+        struct Full;
+        impl Write for Full {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("disk full"))
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut w = StreamWriter::new(&[1u8; 32], Full);
+        assert!(w.write_all(&pt(CHUNK_SIZE + 1)).is_err());
+        assert!(w.write_all(&pt(10)).is_err());
+        assert!(w.flush().is_err());
+        assert!(w.finish().is_err());
     }
 
     #[test]

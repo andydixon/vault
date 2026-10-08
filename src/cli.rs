@@ -477,8 +477,14 @@ fn run(cmd: &str, args: &[String]) -> Result<i32> {
             }
             let (s, _lock) = ctx.open(true)?;
             let mut cat = s.catalogue()?;
-            // Never ingest, or delete, the vault or its key.
-            let skip: Vec<FileId> = [ctx.vault_dir()?, ctx.key()?].iter().filter_map(|p| FileId::of(p, true)).collect();
+            // Never ingest, or delete, the vault, anything inside it, or its key.
+            let vault_dir = ctx.vault_dir()?;
+            if let (Ok(v), Ok(src)) = (std::fs::canonicalize(&vault_dir), std::fs::canonicalize(&pos[0])) {
+                if src != v && src.starts_with(&v) {
+                    crate::bail!("{} is inside the vault", pos[0]);
+                }
+            }
+            let skip: Vec<FileId> = [vault_dir, ctx.key()?].iter().filter_map(|p| FileId::of(p, true)).collect();
             let yes = ctx.flags.yes;
             add_path(&s, &mut cat, Path::new(&pos[0]), &dest, migrate, &skip, &mut |names| {
                 yes || confirm_overwrite(names)

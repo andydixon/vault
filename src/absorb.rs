@@ -52,10 +52,14 @@ pub fn absorb(
         };
         let name = join(&[dest, &rel]);
         let name = VaultName::new(&name).ok_or_else(|| Error::new(format!("invalid vault path {name:?}")))?;
-        let size = entry
-            .header()
-            .size()
-            .map_err(|e| Error::new(format!("reading archive: {}", crate::util::io_reason(&e))))?;
+        // The entry's size, with a PAX "size" override applied, as Go's
+        // hdr.Size; the fixed header field alone would truncate files that
+        // Go's archive/tar writes for sizes past 8 GiB.
+        let size = entry.size();
+        if is_gnu_sparse(&mut entry) {
+            eprintln!("skipping {shown}: sparse files are not supported");
+            continue;
+        }
         let mode = entry.header().mode().unwrap_or(0) & 0o777;
         let mtime = mtime(&mut entry)?;
         match store.add_reader(cat, &mut entry, size, mode, mtime, &name) {
@@ -82,6 +86,18 @@ pub fn safe_name(name: &str) -> Option<String> {
         return None;
     }
     Some(n)
+}
+
+/// A PAX-format GNU sparse file, whose data is an encoded map, not the
+/// file's bytes.
+fn is_gnu_sparse<R: Read>(entry: &mut tar::Entry<R>) -> bool {
+    if entry.header().entry_type() == tar::EntryType::GNUSparse {
+        return true;
+    }
+    match entry.pax_extensions() {
+        Ok(Some(exts)) => exts.flatten().any(|e| e.key_bytes().starts_with(b"GNU.sparse.")),
+        _ => false,
+    }
 }
 
 /// The entry's modification time: the PAX `mtime` (with its fraction) if
@@ -234,6 +250,42 @@ mod tests {
         g[mid] ^= 0xff;
         assert!(absorb(&s, &mut cat, &g[..], "", &mut |_, _| {}).is_err());
         assert_eq!(s.catalogue().unwrap().len(), before);
+    }
+
+    /// A PAX "size" record overrides the header's size field, as Go writes
+    /// for files over 8 GiB; the whole body must be stored.
+    #[test]
+    fn pax_size_override() {
+        let (d, s) = store("absorb-pax");
+        let mut t = Vec::new();
+        let rec = |k: &str, v: &str| {
+            let body = format!(" {k}={v}\n");
+            let mut n = body.len() + 1;
+            while format!("{n}{body}").len() != n {
+                n += 1;
+            }
+            format!("{n}{body}")
+        };
+        let pax = rec("size", "11");
+        let mut h = header("PaxHeaders/big", tar::EntryType::XHeader, pax.len() as u64, 0o644, 0);
+        h.set_cksum();
+        t.extend_from_slice(h.as_bytes());
+        let mut p = pax.into_bytes();
+        p.resize(p.len().div_ceil(512) * 512, 0);
+        t.extend_from_slice(&p);
+        let h = header("big.bin", tar::EntryType::Regular, 0, 0o644, 0);
+        t.extend_from_slice(h.as_bytes());
+        let mut body = b"hello world".to_vec();
+        body.resize(512, 0);
+        t.extend_from_slice(&body);
+        t.extend_from_slice(&[0u8; 1024]);
+        let mut cat = s.catalogue().unwrap();
+        absorb(&s, &mut cat, &t[..], "", &mut |_, _| {}).unwrap();
+        let r = cat.current("big.bin").unwrap();
+        assert_eq!(r.size, 11);
+        let dir = crate::platform::fs::Dir::open(&d.0).unwrap();
+        s.extract(r, &dir, std::ffi::OsStr::new("o")).unwrap();
+        assert_eq!(std::fs::read(d.0.join("o")).unwrap(), b"hello world");
     }
 
     #[test]

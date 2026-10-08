@@ -458,6 +458,17 @@ fn duplicate_records_recover() {
 #[cfg(target_os = "linux")]
 #[test]
 fn repeated_failures_do_not_leak() {
+    // Thread counts are per process, and other tests run in parallel: run
+    // the real check alone in a child copy of this test binary.
+    if std::env::var_os("VAULT_LEAK_CHILD").is_none() {
+        let o = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "store::tests::repeated_failures_do_not_leak", "--test-threads=1"])
+            .env("VAULT_LEAK_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stdout));
+        return;
+    }
     let threads = || std::fs::read_dir("/proc/self/task").unwrap().count();
     let (d, s) = vault("leak");
     let mut cat = s.catalogue().unwrap();

@@ -63,7 +63,8 @@ None of this is erasure from physical memory.
 `VAULT_PASSPHRASE` and `VAULT_DECOY_PASSPHRASE` removed from its environment,
 no secret in its arguments, its working directory `/` and standard error
 closed. It hands over the 34-byte suite ID and seed through a pipe. Before
-reading it, the agent:
+reading it (straight from the pipe into the locked page, with no
+intermediate buffer), the agent:
 
 1. sets the core-dump size limit to zero;
 2. on Linux, sets `PR_SET_DUMPABLE` to 0 (no core dumps, no same-user
@@ -108,16 +109,25 @@ for the passphrase.
   A failure after a record is already in place never deletes its objects.
   Windows has no directory fsync through the APIs used; NTFS journals
   metadata.
+- `migrate` checks an original is still the file it stored (device, inode,
+  size, time; on Windows only size and time) and then deletes it by name; a
+  replacement in the instant between the check and the deletion is not
+  excluded. Paths inside the vault directory are refused outright.
+- A filesystem with neither `RENAME_NOREPLACE` nor hard links (some FUSE
+  mounts, FAT) cannot publish without risking a replace, so `get` fails
+  there with a message saying so rather than fall back.
 - The vault lock uses the same POSIX `fcntl` locks as the Go version, so
   mixed Go and Rust processes exclude each other. Only a read-only
   filesystem lets a reader proceed without the lock.
 
 ## Plaintext on disk
 
-- `vault add URL` and `vault mirror` stream non-HTML downloads to a private
-  (0600) temporary file in `$TMPDIR` before storing them, because the size
-  must be known first; it is removed on every normal path, including
-  errors. HTML and CSS are rewritten in memory. `vault absorb` stores tar
+- `vault add URL` and `vault mirror` stream non-HTML downloads to a 0600
+  temporary file in `$TMPDIR` before storing them, because the size must be
+  known first. On Unix the file is unlinked as soon as it is created, so it
+  has no name and disappears even if vault is killed; on other systems it
+  is a named file removed on every normal path, including errors. HTML and
+  CSS are rewritten in memory. `vault absorb` stores tar
   entries straight from the stream with no temporary file.
 - `vault get` writes plaintext where you ask; `vault migrate` deletes the
   originals with `unlink`, which is not secure deletion.
