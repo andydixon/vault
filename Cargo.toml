@@ -17,7 +17,7 @@ hmac = "0.13"
 sha2 = { version = "0.11", default-features = false }
 sha3 = { version = "0.11", default-features = false }
 ml-kem = { version = "0.3.2", features = ["zeroize", "hazmat"] }
-zeroize = { version = "1.9", features = ["derive"] }
+zeroize = { version = "1.9", features = ["derive", "serde"] }
 getrandom = "0.4"
 base64 = "0.23"
 serde = { version = "1", features = ["derive"] }

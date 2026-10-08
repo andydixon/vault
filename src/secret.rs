@@ -99,9 +99,12 @@ impl SecretVec {
         self.0.resize(n, 0);
     }
 
-    /// Clears the contents for reuse, keeping the allocation.
+    /// Clears the contents for reuse, keeping the allocation. Bytes past
+    /// the length are always zero already (shrinking clears them), so only
+    /// the live part needs overwriting.
     pub fn clear(&mut self) {
-        self.0.zeroize();
+        self.0.as_mut_slice().zeroize();
+        self.0.clear();
     }
 }
 

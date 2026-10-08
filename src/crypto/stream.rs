@@ -185,7 +185,7 @@ impl<W: Write> Drop for StreamWriter<W> {
 }
 
 /// Reads until `buf` is full or the source ends; returns the count.
-pub fn read_full(src: &mut impl Read, buf: &mut [u8]) -> io::Result<usize> {
+pub fn read_full<R: Read + ?Sized>(src: &mut R, buf: &mut [u8]) -> io::Result<usize> {
     let mut n = 0;
     while n < buf.len() {
         match src.read(&mut buf[n..]) {

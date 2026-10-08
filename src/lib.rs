@@ -7,8 +7,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod crypto;
+pub mod error;
 pub mod keyfile;
+pub mod pipeline;
 pub mod platform;
 pub mod rng;
 pub mod secret;
+pub mod store;
 pub mod util;

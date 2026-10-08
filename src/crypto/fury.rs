@@ -130,6 +130,29 @@ pub fn decrypt_reader<R: Read>(src: R, id: &Identity) -> Result<StreamReader<imp
 /// reading no more than that much ciphertext. The result is fully
 /// authenticated, final chunk and end of input included.
 pub fn decrypt_bounded<R: Read>(src: R, id: &Identity, max_plaintext: usize) -> Result<SecretVec, Error> {
+    let mut buf = SecretVec::with_capacity(max_ciphertext(max_plaintext) + 1);
+    decrypt_bounded_into(src, id, max_plaintext, &mut buf)?;
+    Ok(buf)
+}
+
+/// The largest STREAM payload holding at most `max_plaintext` bytes.
+pub fn max_ciphertext(max_plaintext: usize) -> usize {
+    max_plaintext + max_plaintext.div_ceil(stream::CHUNK_SIZE).max(1) * stream::TAG_SIZE
+}
+
+/// As [`decrypt_bounded`], into a caller-supplied buffer whose capacity
+/// must be at least `max_ciphertext(max_plaintext) + 1`. On error the
+/// buffer is left empty.
+pub fn decrypt_bounded_into<R: Read>(src: R, id: &Identity, max_plaintext: usize, buf: &mut SecretVec) -> Result<(), Error> {
+    buf.clear();
+    let r = decrypt_into(src, id, max_plaintext, buf);
+    if r.is_err() {
+        buf.clear();
+    }
+    r
+}
+
+fn decrypt_into<R: Read>(src: R, id: &Identity, max_plaintext: usize, buf: &mut SecretVec) -> Result<(), Error> {
     let (h, mut payload) = header::parse(src).map_err(Error::Header)?;
     let fk = file_key(&h, id)?;
     let mut nonce = [0u8; NONCE_SIZE];
@@ -137,16 +160,15 @@ pub fn decrypt_bounded<R: Read>(src: R, id: &Identity, max_plaintext: usize) -> 
         .read_exact(&mut nonce)
         .map_err(|e| Error::Io(io::Error::new(e.kind(), format!("failed to read nonce: {e}"))))?;
     let key = payload_key(fk.expose(), &nonce);
-    let chunks = max_plaintext.div_ceil(stream::CHUNK_SIZE).max(1);
-    let max_ct = max_plaintext + chunks * stream::TAG_SIZE;
-    let mut buf = SecretVec::zeroed(max_ct + 1);
+    let max_ct = max_ciphertext(max_plaintext);
+    buf.resize_within_capacity(max_ct + 1);
     let n = stream::read_full(&mut payload, buf.expose_mut())?;
     if n > max_ct {
         return Err(Error::TooLarge);
     }
     let plain = stream::open_all(key.expose(), &mut buf.expose_mut()[..n]).map_err(|e| Error::Io(e.into()))?;
     buf.resize_within_capacity(plain);
-    Ok(buf)
+    Ok(())
 }
 
 #[cfg(test)]
