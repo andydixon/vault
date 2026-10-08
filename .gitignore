@@ -7,3 +7,7 @@
 /docs/guide/vault-guide.pdf
 /docs/guide/*.log
 /target
+fuzz/target
+fuzz/corpus
+fuzz/artifacts
+fuzz/coverage

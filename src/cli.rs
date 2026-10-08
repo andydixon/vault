@@ -94,9 +94,10 @@ macro_rules! say {
 fn out(line: &str) {
     let mut o = std::io::stdout().lock();
     if let Err(e) = o.write_all(line.as_bytes()).and_then(|_| o.flush())
-        && e.kind() == std::io::ErrorKind::BrokenPipe {
-            std::process::exit(128 + 13);
-        }
+        && e.kind() == std::io::ErrorKind::BrokenPipe
+    {
+        std::process::exit(128 + 13);
+    }
 }
 
 #[derive(Default)]
@@ -319,9 +320,10 @@ fn default_path(flag: &Option<String>, env: &str, name: &str) -> Result<PathBuf>
 /// environment, else from the key file with the passphrase.
 fn key_identity(key: &Path) -> Result<crate::crypto::kem::Identity> {
     if std::env::var_os(PASSPHRASE_ENV).is_none()
-        && let Ok(id) = agent::identity(key) {
-            return Ok(id);
-        }
+        && let Ok(id) = agent::identity(key)
+    {
+        return Ok(id);
+    }
     let pass = read_passphrase("Enter passphrase:")?;
     keyfile::unlock(key, pass.expose()).map_err(|e| Error::new(e.to_string()))
 }

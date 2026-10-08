@@ -2,11 +2,15 @@
 
 //! The real binaries, end to end: the Rust CLI on its own, and the Rust
 //! and Go CLIs sharing one key, one vault, one lock and one agent.
+// The lock and agent tests are Unix-only; their imports are unused elsewhere.
+#![cfg_attr(not(unix), allow(unused_imports))]
 
 mod common;
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Child, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
@@ -286,6 +290,7 @@ fn absorb_from_stdin() {
 /// Starts `absorb` and feeds it one byte: it takes the exclusive lock and
 /// then holds it until its standard input closes or it is killed. The
 /// caller kills and waits for it.
+#[cfg(unix)]
 #[allow(clippy::zombie_processes)]
 fn hold_lock(e: &Env, bin: &str) -> Child {
     let mut c = e

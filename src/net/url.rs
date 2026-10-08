@@ -81,7 +81,12 @@ fn unescape(s: &str, mode: Mode) -> Result<String, String> {
             b'%' => {
                 let (h, l) = match (b.get(i + 1).copied().and_then(unhex), b.get(i + 2).copied().and_then(unhex)) {
                     (Some(h), Some(l)) => (h, l),
-                    _ => return Err(format!("invalid URL escape {:?}", &s[i..(i + 3).min(s.len())])),
+                    _ => {
+                        return Err(format!(
+                            "invalid URL escape {:?}",
+                            String::from_utf8_lossy(&b[i..(i + 3).min(b.len())])
+                        ));
+                    }
                 };
                 if mode == Mode::Host && h < 8 && &s[i..i + 3] != "%25" {
                     return Err(format!("invalid URL escape {:?}", &s[i..i + 3]));
@@ -445,6 +450,15 @@ pub(crate) mod tests {
         assert_eq!(u.fragment, s("fragment"), "{ctx} Fragment");
         assert_eq!(super::super::local_path(&u), s("local_path"), "{ctx} localPath");
         assert_eq!(super::super::key(&u), s("key"), "{ctx} key");
+    }
+
+    /// Found by fuzzing: a bad escape before a multi-byte character used to
+    /// slice through the character and panic.
+    #[test]
+    fn bad_escape_before_multibyte_character() {
+        assert!(Url::parse("/K%\u{8e3}").is_err());
+        assert!(Url::parse("http://h/%é").is_err());
+        assert!(Url::parse("http://h/%2").is_err());
     }
 
     #[test]

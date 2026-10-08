@@ -24,12 +24,18 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 pub const AGENT_CMD: &str = "__agent";
+#[cfg_attr(not(unix), allow(dead_code))]
 const GET: u8 = b'g';
+#[cfg_attr(not(unix), allow(dead_code))]
 const QUIT: u8 = b'q';
+#[cfg_attr(not(unix), allow(dead_code))]
 const REPLY: usize = 2 + crate::crypto::kem::SEED_SIZE;
+#[cfg_attr(not(unix), allow(dead_code))]
 const TIMEOUT: Duration = Duration::from_secs(2);
 /// How long `unlock` waits for a starting agent to say it is ready.
+#[cfg_attr(not(unix), allow(dead_code))]
 const START_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg_attr(not(unix), allow(dead_code))]
 const SECRET_ENVS: [&str; 2] = ["VAULT_PASSPHRASE", "VAULT_DECOY_PASSPHRASE"];
 
 /// Go's `filepath.Abs`: lexical, with `os.Getwd`'s preference for `$PWD`.
@@ -53,10 +59,12 @@ fn go_getwd() -> std::io::Result<PathBuf> {
     let dot = std::fs::metadata(".")?;
     if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from)
         && pwd.is_absolute()
-            && let Ok(m) = std::fs::metadata(&pwd)
-                && m.dev() == dot.dev() && m.ino() == dot.ino() {
-                    return Ok(pwd);
-                }
+        && let Ok(m) = std::fs::metadata(&pwd)
+        && m.dev() == dot.dev()
+        && m.ino() == dot.ino()
+    {
+        return Ok(pwd);
+    }
     std::env::current_dir()
 }
 
@@ -265,9 +273,11 @@ mod imp {
             // Remove the socket only if it is still the one this agent made.
             use std::os::unix::fs::MetadataExt;
             if let Ok(m) = std::fs::symlink_metadata(sock)
-                && m.ino() == ours.ino() && m.dev() == ours.dev() {
-                    let _ = std::fs::remove_file(sock);
-                }
+                && m.ino() == ours.ino()
+                && m.dev() == ours.dev()
+            {
+                let _ = std::fs::remove_file(sock);
+            }
         };
         {
             use std::os::unix::fs::PermissionsExt;

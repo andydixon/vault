@@ -36,6 +36,7 @@ pub fn create_private_dir_all(p: &Path) -> io::Result<()> {
 }
 
 pub fn create_private_dir(p: &Path) -> io::Result<()> {
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut b = std::fs::DirBuilder::new();
     #[cfg(unix)]
     b.mode(0o700);

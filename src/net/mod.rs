@@ -29,8 +29,8 @@
 //! it; that file holds plaintext until it is removed, on every path, once
 //! stored. HTML and CSS for rewriting are held in memory instead.
 
-mod html;
-mod url;
+pub mod html;
+pub mod url;
 
 #[cfg(test)]
 mod tests;

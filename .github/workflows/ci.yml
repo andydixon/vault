@@ -1,0 +1,102 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Oracle-backed interoperability tests must run, not skip, in CI.
+  VAULT_REQUIRE_ORACLE: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      # The Go toolchain builds the test-only oracle; vault itself needs no Go.
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.x"
+          cache-dependency-path: oracle/go/go.sum
+      - run: rustup show active-toolchain || rustup toolchain install
+      - name: test
+        shell: bash
+        run: |
+          if [[ $RUNNER_OS == Windows ]]; then unset VAULT_REQUIRE_ORACLE; fi
+          cargo test --locked --all-targets --all-features
+      - run: cargo test --locked --doc
+      - run: cargo build --locked --release
+      - name: oracle self-test
+        if: runner.os == 'Linux'
+        working-directory: oracle/go
+        run: go test ./...
+
+  cross:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show active-toolchain || rustup toolchain install
+      - name: zig and cargo-zigbuild
+        run: |
+          curl -sSLo zig.tar.xz https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+          echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  zig.tar.xz" | sha256sum -c
+          mkdir -p "$HOME/zig" && tar -xJf zig.tar.xz -C "$HOME/zig" --strip-components=1
+          echo "$HOME/zig" >>"$GITHUB_PATH"
+          cargo install cargo-zigbuild --version 0.23.4 --locked
+      - name: targets
+        run: |
+          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl i686-unknown-linux-musl \
+            arm-unknown-linux-musleabihf armv7-unknown-linux-musleabihf riscv64gc-unknown-linux-musl \
+            loongarch64-unknown-linux-musl powerpc64le-unknown-linux-musl powerpc64-unknown-linux-gnu \
+            s390x-unknown-linux-gnu x86_64-pc-windows-gnu i686-pc-windows-gnu aarch64-pc-windows-gnullvm wasm32-wasip1
+      - name: build
+        run: |
+          TARGETS="linux/amd64 linux/arm64 linux/386 linux/armv6 linux/armv7 linux/riscv64 linux/loong64 \
+            linux/ppc64le linux/ppc64 linux/s390x windows/amd64 windows/386 windows/arm64 wasip1/wasm" ./build.sh
+      - name: run the arm64 and big-endian s390x builds under qemu
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq qemu-user
+          cargo build --locked --release
+          EMU=qemu-aarch64 scripts/smoke.sh dist/vault-linux-arm64 target/release/vault
+          EMU="qemu-s390x -L /usr/s390x-linux-gnu" scripts/smoke.sh dist/vault-linux-s390x target/release/vault || echo "s390x needs a glibc sysroot; build-only"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: cargo deny --locked check
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install nightly-2026-10-01 --profile minimal
+      - run: cargo +nightly-2026-10-01 install cargo-fuzz --version 0.13.2 --locked
+      - name: a short run of every target
+        working-directory: fuzz
+        run: |
+          for t in $(cargo +nightly-2026-10-01 fuzz list); do
+            cargo +nightly-2026-10-01 fuzz run "$t" -- -max_total_time=60
+          done

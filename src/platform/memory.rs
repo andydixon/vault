@@ -14,6 +14,7 @@
 //! `/proc/PID/mem` access. Other Unix systems get the rlimit only. Windows
 //! is not supported by the agent (see SECURITY.md).
 
+#[cfg(unix)]
 use std::io;
 
 #[cfg(unix)]

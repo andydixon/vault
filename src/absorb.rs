@@ -90,9 +90,10 @@ fn mtime<R: Read>(entry: &mut tar::Entry<R>) -> Result<Instant> {
     if let Ok(Some(exts)) = entry.pax_extensions() {
         for ext in exts.flatten() {
             if ext.key_bytes() == b"mtime"
-                && let Some(t) = std::str::from_utf8(ext.value_bytes()).ok().and_then(parse_pax_time) {
-                    return Ok(t);
-                }
+                && let Some(t) = std::str::from_utf8(ext.value_bytes()).ok().and_then(parse_pax_time)
+            {
+                return Ok(t);
+            }
         }
     }
     let secs = entry
