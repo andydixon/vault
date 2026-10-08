@@ -142,12 +142,18 @@ fn mirror_with(v: &Vault, url: &str, limits: &Limits) -> MirrorOutcome {
     mirror(&v.store, &mut cat, url, "m", limits, &mut |_, _| {}).unwrap()
 }
 
-fn temp_leftovers(prefix: &str) -> usize {
-    std::fs::read_dir(std::env::temp_dir())
-        .unwrap()
-        .flatten()
-        .filter(|e| e.file_name().to_string_lossy().starts_with(prefix))
-        .count()
+/// Staged downloads leave no name behind on Unix (unlinked at creation),
+/// and are removed on drop elsewhere — so counting files in the shared
+/// temp directory, which other tests use concurrently, is never needed.
+#[test]
+fn temp_files_leave_nothing_behind() {
+    let mut t = TempFile::new("vault-test-").unwrap();
+    let path = t.path.clone();
+    t.file().write_all(b"plaintext").unwrap();
+    #[cfg(unix)]
+    assert!(!path.exists(), "the name should be gone at once");
+    drop(t);
+    assert!(!path.exists());
 }
 
 #[test]
@@ -220,9 +226,8 @@ fn add_url_limits() {
     });
     let v = vault();
     let mut cat = v.store.catalogue().unwrap();
-    let before = temp_leftovers("vault-download-");
     let small = Limits {
-        request: Duration::from_millis(500),
+        request: Duration::from_secs(2),
         max_bytes: 4096,
         ..Limits::add_defaults()
     };
@@ -239,7 +244,102 @@ fn add_url_limits() {
     assert!(try_add("/big").unwrap_err().msg.contains("exceeds"));
     assert_eq!(v.get("long"), b"abc");
     assert_eq!(v.names(), ["long"], "nothing else stored");
-    assert!(temp_leftovers("vault-download-") <= before, "temporary download left behind");
+}
+
+/// A redirect to /%2e%2e must not name the download "..", which would
+/// replace the folder's parent entry.
+#[test]
+fn add_url_dot_names_fall_back_to_host() {
+    let srv = Server::start(|p, _| match p {
+        "/up" => redirect("/%2e%2e"),
+        "/.." | "/%2e%2e" => ok("", "dots"),
+        _ => not_found(),
+    });
+    let v = vault();
+    let mut cat = v.store.catalogue().unwrap();
+    let mut got = Vec::new();
+    add_url(&v.store, &mut cat, &srv.url("/up"), "a/b", &Limits::add_defaults(), &mut |n, _| {
+        got.push(n.to_string())
+    })
+    .unwrap();
+    assert_eq!(got, ["a/b/127.0.0.1"]);
+}
+
+/// Bytes received before a failure still count against the mirror budget.
+#[test]
+fn mirror_charges_failed_downloads() {
+    let server = Server::start(|p, _| match p {
+        "/" => ok("text/html", r#"<a href="/1">1</a><a href="/2">2</a>"#),
+        "/1" => {
+            let mut b = b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\nConnection: close\r\n\r\n".to_vec();
+            b.extend_from_slice(&[b'y'; 2000]);
+            Reply::Raw(b)
+        }
+        "/2" => ok("", &"z".repeat(1000)),
+        _ => not_found(),
+    });
+    let v = vault();
+    let lim = Limits {
+        max_bytes: 2500,
+        ..Limits::mirror_defaults()
+    };
+    match mirror_with(&v, &server.url("/"), &lim) {
+        MirrorOutcome::Partial { stored: 1, skipped: 2 } => {}
+        MirrorOutcome::Partial { stored, skipped } => panic!("stored {stored}, skipped {skipped}"),
+        MirrorOutcome::Complete { .. } => panic!("truncated body not charged"),
+    }
+}
+
+/// Links that decode to "." or ".." segments never escape the mirror's
+/// folder, and rewritten links are escaped.
+#[test]
+fn mirror_refuses_escaping_paths() {
+    let srv = Arc::new(std::sync::OnceLock::<String>::new());
+    let s2 = Arc::clone(&srv);
+    let server = Server::start(move |p, _| {
+        let h = s2.get().unwrap().trim_start_matches("http:").to_string();
+        match p {
+            "/" => ok(
+                "text/html",
+                &format!(r#"<a href="/%2e%2e/x">a</a><a href="{h}/..%2f..%2fq">b</a><a href="/a%3Fb">c</a><a href="/c:d">d</a>"#),
+            ),
+            "/a%3Fb" | "/c:d" => ok("", "fine"),
+            _ => ok("", "should never be stored"),
+        }
+    });
+    srv.set(server.url("")).unwrap();
+    let v = vault();
+    let out = mirror_with(&v, &server.url("/"), &Limits::mirror_defaults());
+    assert!(matches!(out, MirrorOutcome::Partial { stored: 3, skipped: 2 }), "{:?}", v.names());
+    let h = &server.addr;
+    for n in v.names() {
+        assert!(n.starts_with(&format!("m/{h}/")), "stored outside the mirror: {n}");
+    }
+    let index = String::from_utf8(v.get(&format!("m/{h}/index.html"))).unwrap();
+    assert!(index.contains(r#"href="a%3Fb""#), "{index}");
+    assert!(index.contains(r#"href="./c:d""#), "{index}");
+    assert!(index.contains(r#"href="/%2e%2e/x""#), "unsafe links are left as they were: {index}");
+}
+
+/// A deeply nested page full of links to the root cannot make the rewrite
+/// balloon: past four times the rewrite limit, the page is skipped.
+#[test]
+fn mirror_bounds_rewrite_growth() {
+    let deep = format!("/{}p.html", "d/".repeat(40));
+    let page = format!("<style>{}</style>", "a{b:url(/)}".repeat(80));
+    let server = Server::start(move |p, _| match p {
+        "/" => ok("text/html", "root"),
+        _ => ok("text/html", &page),
+    });
+    let v = vault();
+    let lim = Limits {
+        max_text: 1000,
+        ..Limits::mirror_defaults()
+    };
+    assert!(matches!(
+        mirror_with(&v, &server.url(&deep), &lim),
+        MirrorOutcome::Partial { stored: 0, skipped: 1 }
+    ));
 }
 
 /// Go's TestMirror: links in HTML and CSS become relative, off-host links
@@ -398,6 +498,12 @@ fn proxy_rules() {
     assert!(!use_proxy(&u("http://localhost:8080/"), ""));
     assert!(!use_proxy(&u("http://127.0.0.1/"), ""));
     assert!(!use_proxy(&u("http://[::1]/"), ""));
+    assert!(!use_proxy(&u("http://[::ffff:127.0.0.1]/"), ""));
+    assert_eq!(
+        u("http://user:secret@h/x").redacted(),
+        "http://h/x",
+        "credentials stay out of messages"
+    );
     assert!(use_proxy(&u("http://example.com/"), "other.com"));
     assert!(!use_proxy(&u("http://example.com/"), "example.com"));
     assert!(!use_proxy(&u("http://a.example.com/"), "example.com"));

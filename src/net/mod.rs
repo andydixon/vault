@@ -25,9 +25,11 @@
 //! | HTML/CSS held to rewrite | —       | 16 MiB per page |
 //!
 //! Downloads that are not rewritten are streamed to a private (0600)
-//! temporary file, because the vault needs a file's size before storing
-//! it; that file holds plaintext until it is removed, on every path, once
-//! stored. HTML and CSS for rewriting are held in memory instead.
+//! temporary file in the temp directory, because the vault needs a file's
+//! size before storing it. On Unix the file is unlinked as soon as it is
+//! created, so its plaintext disappears with the process however it ends;
+//! elsewhere it is removed on every normal path. HTML and CSS for
+//! rewriting are held in memory instead.
 
 pub mod html;
 pub mod url;
@@ -39,7 +41,7 @@ use crate::error::{Error, Result};
 use crate::store::{Catalogue, FILE_LIMIT, Store, VaultName};
 use crate::util::Instant;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 pub use url::Url;
@@ -129,7 +131,8 @@ impl Client {
     fn agent(&mut self, proxy: Option<String>) -> std::result::Result<&ureq::Agent, String> {
         if !self.agents.contains_key(&proxy) {
             let p = match &proxy {
-                Some(p) => Some(ureq::Proxy::new(p).map_err(|e| format!("invalid proxy {p:?}: {e}"))?),
+                // The value may hold credentials: never echo it.
+                Some(p) => Some(ureq::Proxy::new(p).map_err(|_| "invalid proxy setting in the environment".to_string())?),
                 None => None,
             };
             let tls = ureq::tls::TlsConfig::builder()
@@ -160,7 +163,7 @@ impl Client {
                 return Err(format!("unsupported protocol scheme {:?}", cur.scheme));
             }
             let agent = self.agent(proxy_for(&cur))?;
-            let resp = agent.get(cur.to_string()).call().map_err(|e| e.to_string())?;
+            let resp = agent.get(cur.to_string()).call().map_err(ureq_reason)?;
             let code = resp.status().as_u16();
             let location = resp.headers().get("location").and_then(|v| v.to_str().ok()).map(str::to_string);
             match (code, location) {
@@ -170,13 +173,25 @@ impl Client {
                     }
                     cur = cur.join(&loc).map_err(|e| format!("bad redirect location {loc:?}: {e}"))?;
                     if host.is_some_and(|h| cur.host.to_lowercase() != h) {
-                        return Err(format!("redirected to another host: {cur}"));
+                        return Err(format!("redirected to another host: {}", cur.redacted()));
                     }
                 }
                 _ => return Ok((cur, resp)),
             }
         }
         unreachable!("the loop returns on its last hop")
+    }
+}
+
+/// A ureq error as a lower-case diagnostic.
+fn ureq_reason(e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Io(io) => crate::util::io_reason(&io),
+        e => {
+            let s = e.to_string();
+            let mut c = s.chars();
+            c.next().map_or(s.clone(), |f| f.to_lowercase().chain(c).collect())
+        }
     }
 }
 
@@ -189,28 +204,32 @@ fn status_error(resp: &Response) -> Option<String> {
     })
 }
 
-/// Copies at most `budget` decoded body bytes to `dst`; returns the count.
-fn copy_body(resp: &mut Response, dst: &mut dyn Write, budget: u64) -> std::result::Result<u64, FetchError> {
+/// Copies at most `budget` decoded body bytes to `dst`. Returns the bytes
+/// received, which count against budgets even when the copy fails.
+fn copy_body(resp: &mut Response, dst: &mut dyn Write, budget: u64) -> (u64, std::result::Result<(), FetchError>) {
     let mut r = resp.body_mut().with_config().limit(u64::MAX).reader();
     let mut buf = vec![0u8; 64 << 10];
     let mut n = 0u64;
     loop {
         let k = match r.read(&mut buf) {
-            Ok(0) => return Ok(n),
+            Ok(0) => return (n, Ok(())),
             Ok(k) => k,
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(FetchError::Other(crate::util::io_reason(&e))),
+            Err(e) => return (n, Err(FetchError::Other(crate::util::io_reason(&e)))),
         };
         n += k as u64;
         if n > budget {
-            return Err(FetchError::Budget(budget));
+            return (n, Err(FetchError::Budget(budget)));
         }
-        dst.write_all(&buf[..k])
-            .map_err(|e| FetchError::Other(crate::util::io_reason(&e)))?;
+        if let Err(e) = dst.write_all(&buf[..k]) {
+            return (n, Err(FetchError::Other(crate::util::io_reason(&e))));
+        }
     }
 }
 
-/// A private temporary file, removed when dropped.
+/// A private (0600) temporary file. On Unix its name is removed at once,
+/// so nothing is left behind even if the process is killed; elsewhere it
+/// is removed when dropped.
 struct TempFile {
     file: Option<std::fs::File>,
     path: PathBuf,
@@ -219,14 +238,41 @@ struct TempFile {
 impl TempFile {
     fn new(prefix: &str) -> Result<TempFile> {
         let dir = std::env::temp_dir();
-        let (file, path) = crate::platform::fs::create_temp(&dir, prefix).map_err(|e| Error::io("create temporary file in", &dir, &e))?;
-        Ok(TempFile { file: Some(file), path })
+        loop {
+            let r: [u8; 8] = crate::rng::os().array();
+            let path = dir.join(format!("{prefix}{}", crate::store::hex(&r)));
+            let mut o = std::fs::OpenOptions::new();
+            o.read(true).write(true).create_new(true);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+            match o.open(&path) {
+                Ok(file) => {
+                    #[cfg(unix)]
+                    std::fs::remove_file(&path).map_err(|e| Error::io("remove", &path, &e))?;
+                    return Ok(TempFile { file: Some(file), path });
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(Error::io("create temporary file in", &dir, &e)),
+            }
+        }
+    }
+
+    fn file(&mut self) -> &mut std::fs::File {
+        self.file.as_mut().expect("open")
+    }
+
+    /// Stores the `n` bytes written so far as `name`.
+    fn store(mut self, store: &Store, cat: &mut Catalogue, n: u64, mtime: Instant, name: &VaultName) -> Result<crate::store::Added> {
+        let f = self.file.as_mut().expect("open");
+        f.rewind().map_err(|e| Error::io("seek", &self.path, &e))?;
+        store.add_reader(cat, f, n, 0o600, mtime, name)
     }
 }
 
 impl Drop for TempFile {
     fn drop(&mut self) {
         drop(self.file.take());
+        #[cfg(not(unix))]
         let _ = std::fs::remove_file(&self.path);
     }
 }
@@ -247,30 +293,32 @@ pub fn add_url(
     report: &mut dyn FnMut(&VaultName, bool),
 ) -> Result<()> {
     let u = Url::parse(url).map_err(|e| Error::new(format!("{url}: {e}")))?;
+    let shown = u.redacted();
     let mut client = Client::new(limits);
-    let (fin, mut resp) = client.get(&u, None).map_err(|e| Error::new(format!("{url}: {e}")))?;
+    let (fin, mut resp) = client.get(&u, None).map_err(|e| Error::new(format!("{shown}: {e}")))?;
     if let Some(e) = status_error(&resp) {
-        crate::bail!("{url}: {e}");
+        crate::bail!("{shown}: {e}");
     }
     let mut name = crate::util::base(&fin.path);
-    if name == "/" || name == "." {
+    // A path ending in "." or ".." (say from a redirect to /%2e%2e) must
+    // not climb out of dest.
+    if matches!(name.as_str(), "/" | "." | ".." | "") {
         name = fin.hostname().to_string();
     }
     let vn = vault_name(dest, &name)?;
+    if !dest.is_empty() && !vn.as_str().starts_with(&format!("{dest}/")) {
+        crate::bail!("{shown}: unsafe name {name:?}");
+    }
     let mut tmp = TempFile::new("vault-download-")?;
-    let f = tmp.file.as_mut().expect("open");
-    copy_body(&mut resp, f, limits.max_bytes.min(FILE_LIMIT)).map_err(|e| Error::new(format!("{url}: {e}")))?;
-    if let Some(t) = resp
+    let (n, r) = copy_body(&mut resp, tmp.file(), limits.max_bytes.min(FILE_LIMIT));
+    r.map_err(|e| Error::new(format!("{shown}: {e}")))?;
+    let mtime = resp
         .headers()
         .get("last-modified")
         .and_then(|v| v.to_str().ok())
         .and_then(parse_http_time)
-    {
-        let t = Instant { secs: t, nanos: 0 }.to_system();
-        let _ = f.set_times(std::fs::FileTimes::new().set_accessed(t).set_modified(t));
-    }
-    drop(tmp.file.take());
-    let (added, _) = store.add_file(cat, &tmp.path, &vn)?;
+        .map_or_else(Instant::now, |secs| Instant { secs, nanos: 0 });
+    let added = tmp.store(store, cat, n, mtime, &vn)?;
     report(&vn, added.replaced);
     Ok(())
 }
@@ -294,6 +342,12 @@ pub(crate) fn local_path(u: &Url) -> String {
 }
 
 /// A page's identity, independent of its fragment (Go's key).
+/// Whether a local path stays inside the mirror: no ".", ".." or empty
+/// segments (a decoded `%2e%2e` would otherwise climb out).
+fn safe_local(local: &str) -> bool {
+    !local.split('/').any(|s| s.is_empty() || s == "." || s == "..")
+}
+
 pub(crate) fn key(u: &Url) -> String {
     let mut c = u.clone();
     c.clear_fragment();
@@ -370,12 +424,12 @@ pub fn mirror(
         match c.one(cat, &u, report) {
             Ok(()) => stored += 1,
             Err(FetchError::Budget(n)) => {
-                eprintln!("skipping {u}: the mirror's {n}-byte budget is used up");
+                eprintln!("skipping {}: the mirror's {n}-byte budget is used up", u.redacted());
                 skipped += 1 + c.queue.len() as u64;
                 c.queue.clear();
             }
             Err(FetchError::Other(e)) => {
-                eprintln!("skipping {u}: {e}");
+                eprintln!("skipping {}: {e}", u.redacted());
                 skipped += 1;
             }
         }
@@ -407,6 +461,9 @@ impl Crawl<'_> {
 
     fn one(&mut self, cat: &mut Catalogue, u: &Url, report: &mut dyn FnMut(&VaultName, bool)) -> std::result::Result<(), FetchError> {
         let local = local_path(u);
+        if !safe_local(&local) {
+            return Err(format!("unsafe local name {local:?}").into());
+        }
         let k = key(u);
         match self.owners.get(&local) {
             Some(owner) if *owner != k => return Err(format!("its local name {local} is already used by {owner}").into()),
@@ -415,6 +472,9 @@ impl Crawl<'_> {
             }
         }
         let name = vault_name(&self.root, &local).map_err(|e| e.msg)?;
+        if !name.as_str().starts_with(&format!("{}/", self.root)) {
+            return Err(format!("unsafe local name {local:?}").into());
+        }
         let (fin, mut resp) = self.client.get(u, Some(&self.host))?;
         if let Some(e) = status_error(&resp) {
             return Err(e.into());
@@ -429,32 +489,38 @@ impl Crawl<'_> {
         let added = if is_html || is_css {
             let mut body = Vec::new();
             let cap = self.budget.min(self.max_text);
-            let n = copy_body(&mut resp, &mut body, cap).map_err(|e| match e {
-                FetchError::Budget(_) if cap < self.budget => {
+            let (n, r) = copy_body(&mut resp, &mut body, cap);
+            self.budget = self.budget.saturating_sub(n);
+            r.map_err(|e| match e {
+                FetchError::Budget(_) if cap < self.budget + n => {
                     FetchError::Other(format!("larger than the {}-byte limit for pages to rewrite", self.max_text))
                 }
                 e => e,
             })?;
-            self.budget -= n;
-            let body = self.rewrite(&body, is_html, &fin, &local);
+            let body = self.rewrite(&body, is_html, &fin, &local)?;
             self.store
                 .add_reader(cat, &mut &body[..], body.len() as u64, 0o600, Instant::now(), &name)
                 .map_err(|e| FetchError::Other(e.msg))?
         } else {
             let mut tmp = TempFile::new("vault-mirror-").map_err(|e| FetchError::Other(e.msg))?;
-            let n = copy_body(&mut resp, tmp.file.as_mut().expect("open"), self.budget)?;
-            self.budget -= n;
-            drop(tmp.file.take());
-            self.store.add_file(cat, &tmp.path, &name).map_err(|e| FetchError::Other(e.msg))?.0
+            let (n, r) = copy_body(&mut resp, tmp.file(), self.budget);
+            self.budget = self.budget.saturating_sub(n);
+            r?;
+            tmp.store(self.store, cat, n, Instant::now(), &name)
+                .map_err(|e| FetchError::Other(e.msg))?
         };
         report(&name, added.replaced);
         Ok(())
     }
 
     /// Rewrites links that point into the mirror, queueing their targets.
-    fn rewrite(&mut self, body: &[u8], is_html: bool, page: &Url, local: &str) -> Vec<u8> {
+    /// Refuses a page whose rewritten links would add more than four times
+    /// the rewrite limit (deeply nested pages multiply every "../").
+    fn rewrite(&mut self, body: &[u8], is_html: bool, page: &Url, local: &str) -> std::result::Result<Vec<u8>, FetchError> {
         let base = std::cell::RefCell::new(page.clone());
-        let found = std::cell::RefCell::new(Vec::new());
+        let found = std::cell::RefCell::new((Vec::new(), HashSet::new()));
+        let added = std::cell::Cell::new(0u64);
+        let cap = self.max_text.saturating_mul(4);
         let host = self.host.clone();
         let mut link = |v: &str| -> Option<String> {
             let mut l = base.borrow().join(v).ok()?;
@@ -466,31 +532,49 @@ impl Crawl<'_> {
             if l.path.is_empty() && l.raw_query.is_empty() {
                 l = l.join("/").ok()?;
             }
-            let mut r = relative(local, &local_path(&l));
-            found.borrow_mut().push(l);
+            let target = local_path(&l);
+            {
+                let (list, set) = &mut *found.borrow_mut();
+                if set.insert(key(&l)) {
+                    // Queued even when unsafe, so it is reported as skipped.
+                    list.push(l);
+                }
+            }
+            if !safe_local(&target) {
+                return None;
+            }
+            let mut r = url::escape_path(&relative(local, &target));
+            if r.split('/').next().is_some_and(|s| s.contains(':')) {
+                r.insert_str(0, "./");
+            }
             if !frag.is_empty() {
                 r.push('#');
                 r.push_str(&frag);
             }
-            Some(r)
+            added.set(added.get() + r.len() as u64);
+            (added.get() <= cap).then_some(r)
         };
         let out = if is_html {
             let mut on_base = |v: &str| -> Option<String> {
-                let b = base.borrow().join(v).ok()?;
-                let same = (b.scheme == "http" || b.scheme == "https") && b.host.to_lowercase() == host;
-                *base.borrow_mut() = b;
-                // Point the copy's base at the page itself, so the relative
-                // links written here resolve as intended.
-                same.then(|| relative(local, local))
+                let joined = base.borrow().join(v);
+                if let Ok(b) = joined {
+                    *base.borrow_mut() = b;
+                }
+                // Point the copy's base at the page itself, whatever host it
+                // named, so the relative links written here resolve offline.
+                Some(relative(local, local))
             };
             html::rewrite_html(body, &mut on_base, &mut link)
         } else {
             html::rewrite_css(body, false, &mut link)
         };
-        for l in found.into_inner() {
+        if added.get() > cap {
+            return Err(FetchError::Other(format!("rewriting its links would grow it past {cap} bytes")));
+        }
+        for l in found.into_inner().0 {
             self.enqueue(l);
         }
-        out
+        Ok(out)
     }
 }
 
@@ -499,7 +583,7 @@ fn proxy_for(u: &Url) -> Option<String> {
     let env = |names: &[&str]| names.iter().find_map(|n| std::env::var(n).ok().filter(|v| !v.is_empty()));
     let proxy = if u.scheme == "https" {
         env(&["HTTPS_PROXY", "https_proxy"])
-    } else if std::env::var_os("REQUEST_METHOD").is_some() {
+    } else if std::env::var_os("REQUEST_METHOD").is_some_and(|v| !v.is_empty()) {
         None
     } else {
         env(&["HTTP_PROXY", "http_proxy"])
@@ -511,7 +595,10 @@ fn proxy_for(u: &Url) -> Option<String> {
 }
 
 /// Whether `u` should go through a proxy given `no_proxy` (Go's
-/// httpproxy semantics).
+/// httpproxy semantics). Known differences from Go, all in the direction of
+/// using the proxy: IP entries in `NO_PROXY` ignore any port, bracketed
+/// IPv6 entries with a port never match, and host names are not
+/// IDNA-normalised.
 fn use_proxy(u: &Url, no_proxy: &str) -> bool {
     let host = u.hostname().to_lowercase();
     let port = u.port_or_default();
@@ -519,7 +606,11 @@ fn use_proxy(u: &Url, no_proxy: &str) -> bool {
         return false;
     }
     let ip: Option<std::net::IpAddr> = host.parse().ok();
-    if ip.is_some_and(|ip| ip.is_loopback()) {
+    let loopback = |ip: std::net::IpAddr| match ip {
+        std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(v6.is_loopback(), |v4| v4.is_loopback()),
+        ip => ip.is_loopback(),
+    };
+    if ip.is_some_and(loopback) {
         return false;
     }
     for entry in no_proxy.split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()) {

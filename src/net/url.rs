@@ -54,6 +54,12 @@ fn should_escape(c: u8, mode: Mode) -> bool {
     true
 }
 
+/// Percent-escapes `s` for use as a URL path, as Go's `PathEscape` does
+/// within a path (slashes kept).
+pub fn escape_path(s: &str) -> String {
+    escape(s, Mode::Path)
+}
+
 fn escape(s: &str, mode: Mode) -> String {
     let mut o = String::with_capacity(s.len());
     for &c in s.as_bytes() {
@@ -301,6 +307,13 @@ impl Url {
         let p = resolve_path(&self.escaped_path(), &r.escaped_path());
         let _ = u.set_path(&p);
         u
+    }
+
+    /// The URL without userinfo, for messages.
+    pub fn redacted(&self) -> String {
+        let mut c = self.clone();
+        c.user = None;
+        c.to_string()
     }
 
     pub fn clear_fragment(&mut self) {
