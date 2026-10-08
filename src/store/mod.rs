@@ -215,9 +215,10 @@ impl Store {
             let sp = dir.join(&shard.0);
             for (name, _) in sorted_dir(&sp)? {
                 if let Some(id) = name.to_str().and_then(Id::parse)
-                    && id.shard() == shard.0.to_string_lossy() {
-                        ids.push(id);
-                    }
+                    && id.shard() == shard.0.to_string_lossy()
+                {
+                    ids.push(id);
+                }
             }
         }
         let mut cat = Catalogue::default();
@@ -337,10 +338,11 @@ impl Store {
         let mut remaining = size;
         for i in 0..object_count(size) {
             if pending.len() == OBJECT_BUFFERS
-                && let Err(e) = pending.pop_front().expect("non-empty").wait().map_err(Error::new).and_then(|r| r) {
-                    first_err = Some(e);
-                    break;
-                }
+                && let Err(e) = pending.pop_front().expect("non-empty").wait().map_err(Error::new).and_then(|r| r)
+            {
+                first_err = Some(e);
+                break;
+            }
             let id = seed.object_id(i);
             let part = remaining.min(CHUNK_DATA) as usize;
             remaining -= part as u64;

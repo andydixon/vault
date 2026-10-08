@@ -207,12 +207,14 @@ pub struct Dir {
 
 impl Dir {
     /// Opens the chosen destination itself; a symlink here is followed,
-    /// because the user named it.
+    /// because the user named it. An empty path is the current directory
+    /// (and names inside it are shown without a "./").
     pub fn open(path: &Path) -> io::Result<Dir> {
+        let real = if path.as_os_str().is_empty() { Path::new(".") } else { path };
         #[cfg(unix)]
         {
             use rustix::fs::{CWD, Mode, OFlags, openat};
-            let fd = openat(CWD, path, OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC, Mode::empty())?;
+            let fd = openat(CWD, real, OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC, Mode::empty())?;
             Ok(Dir {
                 path: path.to_path_buf(),
                 fd,
@@ -220,7 +222,7 @@ impl Dir {
         }
         #[cfg(not(unix))]
         {
-            if !std::fs::metadata(path)?.is_dir() {
+            if !std::fs::metadata(real)?.is_dir() {
                 return Err(io::Error::new(
                     io::ErrorKind::NotADirectory,
                     format!("{} is not a directory", path.display()),
