@@ -135,9 +135,14 @@ impl Client {
                 Some(p) => Some(ureq::Proxy::new(p).map_err(|_| "invalid proxy setting in the environment".to_string())?),
                 None => None,
             };
-            let tls = ureq::tls::TlsConfig::builder()
-                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                .build();
+            // The operating system's trust store; builds without the
+            // `system-roots` feature (macOS binaries cross-built without
+            // Apple's SDK) use the bundled Mozilla roots instead.
+            #[cfg(feature = "system-roots")]
+            let roots = ureq::tls::RootCerts::PlatformVerifier;
+            #[cfg(not(feature = "system-roots"))]
+            let roots = ureq::tls::RootCerts::WebPki;
+            let tls = ureq::tls::TlsConfig::builder().root_certs(roots).build();
             let l = &self.limits;
             let cfg = ureq::Agent::config_builder()
                 .tls_config(tls)

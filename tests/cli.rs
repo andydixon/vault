@@ -313,7 +313,7 @@ fn hold_lock(e: &Env, bin: &str) -> Child {
     c.stdin.as_mut().unwrap().write_all(b"\0").unwrap();
     // Wait until the lock file is held exclusively: probe with our own
     // fcntl lock attempt from this process.
-    let deadline = Instant::now() + Duration::from_secs(20);
+    let deadline = Instant::now() + Duration::from_secs(120);
     loop {
         if locked_exclusively(&e.dir.join("store/.lock")) {
             return c;
@@ -350,13 +350,32 @@ fn lock_contention(holder: &str, waiter: &str) {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    std::thread::sleep(Duration::from_millis(1500));
+    // Wait (however long unlocking takes on a busy machine) until the
+    // reader says it is blocked on the lock, and is still running.
+    let mut err = w.stderr.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::Read;
+        let mut all = Vec::new();
+        let mut buf = [0u8; 256];
+        while let Ok(n) = err.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            all.extend_from_slice(&buf[..n]);
+            if String::from_utf8_lossy(&all).contains("waiting for another vault process to finish") {
+                let _ = tx.send(());
+            }
+        }
+    });
+    rx.recv_timeout(Duration::from_secs(120))
+        .expect("reader never reported waiting for the lock");
+    std::thread::sleep(Duration::from_millis(300));
     assert!(w.try_wait().unwrap().is_none(), "reader did not wait for the writer");
     h.kill().unwrap(); // death releases the lock
     let _ = h.wait();
     let o = w.wait_with_output().unwrap();
-    assert!(o.status.success());
-    assert!(String::from_utf8_lossy(&o.stderr).contains("waiting for another vault process to finish"));
+    assert!(o.status.success(), "reader failed after the writer died");
 }
 
 #[cfg(unix)]

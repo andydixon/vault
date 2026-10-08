@@ -134,8 +134,9 @@ for the passphrase.
 
 ## Network
 
-Downloads verify TLS certificates (rustls with the platform verifier; it is
-never disabled), follow at most 10 redirects (http and https only; for
+Downloads verify TLS certificates (rustls with the operating system's trust
+store; macOS binaries cross-built on Linux use the bundled Mozilla roots
+instead, see `docs/PLATFORMS.md`; verification is never disabled), follow at most 10 redirects (http and https only; for
 `mirror`, only to the same host), and are bounded by connect, response and
 whole-request deadlines and a byte budget counted after decompression. See
 `vault(1)` for the defaults and flags.

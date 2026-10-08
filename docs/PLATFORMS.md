@@ -33,8 +33,8 @@ the port: the Go release's more exotic targets are no longer built).
 | windows/amd64 | x86_64-pc-windows-gnu | static CRT | zig | build; tests cross-compile cleanly; runtime in CI only (windows-2025 job, not yet run) |
 | windows/386 | i686-pc-windows-gnu | static CRT | zig | build only |
 | windows/arm64 | aarch64-pc-windows-gnullvm | static CRT | zig | build only |
-| darwin/amd64 | x86_64-apple-darwin | system | a Mac (Xcode) | CI only (macos-15-intel job, not yet run) |
-| darwin/arm64 | aarch64-apple-darwin | system | a Mac (Xcode) | CI only (macos-15 job, not yet run) |
+| darwin/amd64 | x86_64-apple-darwin | system | a Mac, or zig (note 2) | build only from Linux; tested in CI on macos-15-intel |
+| darwin/arm64 | aarch64-apple-darwin | system | a Mac, or zig (note 2) | build only from Linux; tested in CI on macos-15 |
 | freebsd/amd64 | x86_64-unknown-freebsd | system | cross 0.2.5 (Docker) | build only (no emulator) |
 | freebsd/386 | i686-unknown-freebsd | system | cross 0.2.5 (Docker) | build only |
 
@@ -47,6 +47,12 @@ disables core dumps. See `SECURITY.md`.
    process spins). `build.sh` and `packaging/package.sh` build that target
    with `--cfg getrandom_backend="linux_raw"`, which makes the `getrandom`
    crate issue the system call itself; with that flag the binary passes.
+2. Without Apple's SDK there is no Security framework to link, so `build.sh`
+   on Linux cross-builds macOS with `--no-default-features`: those binaries
+   verify TLS for `add URL` and `mirror` against the bundled Mozilla roots
+   instead of the macOS keychain (so a corporate CA added to the keychain is
+   not trusted). Built on a Mac, or through Homebrew
+   (`brew install andydixon/tap/vault`), they use the keychain.
 
 ## No longer released
 
