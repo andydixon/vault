@@ -478,12 +478,25 @@ fn agent_idle_extends_and_expires() {
     genkey(&e, RUST, false);
     e.ok(RUST, Some(REAL), &["init"]);
     e.ok(RUST, Some(REAL), &["unlock", "--for", "2s", "--idle"]);
-    for _ in 0..4 {
+    // Fetch the key and stop: with no vault there, a command that got the
+    // key from the agent fails at once with "not a vault"; one that did not
+    // fails asking for the passphrase. This keeps slow (debug) builds from
+    // stretching the gaps between uses.
+    let use_key = || {
+        let o = e
+            .cmd(RUST, None)
+            .env("VAULT_DIR", e.dir.join("nowhere"))
+            .arg("list")
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&o.stderr).contains("is not a vault")
+    };
+    for i in 0..4 {
         std::thread::sleep(Duration::from_millis(900));
-        e.ok(RUST, None, &["list"]); // each use pushes expiry back
+        assert!(use_key(), "idle agent expired while in use (use {i})"); // each use pushes expiry back
     }
     std::thread::sleep(Duration::from_millis(3500));
-    assert!(!e.run(RUST, None, &["list"]).status.success(), "idle agent outlived its idle time");
+    assert!(!use_key(), "idle agent outlived its idle time");
 }
 
 #[cfg(unix)]

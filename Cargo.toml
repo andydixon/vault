@@ -36,6 +36,13 @@ rustix = { version = "1.1.5", features = ["fs", "process", "mm", "termios", "eve
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Memory", "Win32_Security"] }
 
+# Tests run the real KEMs and Argon2id; unoptimised they are far too slow.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true
