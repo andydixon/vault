@@ -1,4 +1,4 @@
-.TH VAULT-MIRROR 1 "September 2026" "vault" "User Commands"
+.TH VAULT-MIRROR 1 "October 2026" "vault" "User Commands"
 .SH NAME
 vault-mirror \- mirror a website into an encrypted vault
 .SH SYNOPSIS
@@ -7,6 +7,12 @@ vault-mirror \- mirror a website into an encrypted vault
 .IR PATH ]
 .RB [ \-\-vault
 .IR DIR ]
+.RB [ \-\-max\-pages
+.IR N ]
+.RB [ \-\-max\-bytes
+.IR SIZE ]
+.RB [ \-\-timeout
+.IR DURATION ]
 .I URL
 .RI [ FOLDER ]
 .SH DESCRIPTION
@@ -20,21 +26,30 @@ and stores every page and asset it finds in the vault, beneath
 if no folder is given).
 .PP
 The crawl is single threaded: one request at a time, in breadth-first order.
-It follows only links on the same host as
+It follows only links on the same host (and port) as
 .IR URL ,
-and requests are sent with a Chrome user agent string.
+and only redirects to that host; a redirect elsewhere skips the page.
+Requests are sent with a Chrome user agent string, and certificates are
+always verified.
 .PP
-Links in HTML
+Links in HTML start tags
 .RB ( href ,
 .BR src ,
 .BR action
 and
 .B poster
-attributes) and in CSS
-.RB ( url(...) )
-that point into the mirror are rewritten to relative paths, so the copy
-browses correctly once fetched out of the vault. Links to other hosts, and
-fragments, are left as they were.
+attributes) and CSS
+.RB ( url(...)
+in style sheets,
+.B <style>
+elements and
+.B style
+attributes) that point into the mirror are rewritten to relative paths, so
+the copy browses correctly once fetched out of the vault. Relative links are
+resolved against the page's final address and its
+.B <base href>
+if it has one. Links to other hosts, script and comment text, and every
+other byte of the page are left as they were. Fragments are kept.
 .PP
 Pages are named after their URL path. A path that is empty or ends in
 .B /
@@ -42,19 +57,39 @@ becomes
 .BR index.html ;
 a query string is appended as
 .BI _ query
-(URL-escaped). Anything already stored under the same name is replaced.
+(URL-escaped). A name already stored by an earlier run is replaced, but if
+two different URLs in one crawl would get the same name, the second is
+skipped rather than overwriting the first.
 .PP
-A page that fails to download, or answers with anything but
+A page that fails to download, answers with anything but
 .BR "200 OK" ,
-is reported on standard error and skipped; the crawl carries on.
-The vault is locked exclusively for the whole run.
+or exceeds a limit is reported on standard error as
+.BI "skipping " URL ": " reason
+and skipped; the crawl carries on. HTML and CSS are rewritten in memory;
+other files are staged in a private temporary file (plaintext on disk
+meanwhile) that is always removed. The vault is locked exclusively for the
+whole run.
 .SH OPTIONS
+.TP
+.BI \-\-max\-pages " N"
+Pages and assets to fetch at most. Default 10000.
+.TP
+.BI \-\-max\-bytes " SIZE"
+Total bytes to download at most, counted after decompression. Default 4G.
+.TP
+.BI \-\-timeout " DURATION"
+Deadline for each request. Default 5m.
 .TP
 .BI \-\-key " PATH"
 Key file. Default: $VAULT_KEY, else ~/.vault/key.
 .TP
 .BI \-\-vault " DIR"
 Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.PP
+A single HTML or CSS file larger than 16 MiB is skipped.
+.SH EXIT STATUS
+0 when everything found was stored, 3 when some of it was skipped, 1 on
+an error that stops the crawl.
 .SH ENVIRONMENT
 .TP
 .B VAULT_PASSPHRASE
@@ -75,11 +110,19 @@ vault mirror https://example.com/ archive/2026
 vault get archive/2026/example.com/index.html
 .RE
 .SH LIMITATIONS
-Links are found by pattern matching, not by parsing HTML: URLs assembled by
-scripts, and
+URLs assembled by scripts, and
 .B srcset
-lists, are neither followed nor rewritten. There is no depth limit, rate
-limit or robots.txt handling; only mirror sites you may copy.
+lists, are neither followed nor rewritten. In attribute values only numeric
+character references and
+.BR &amp; ,
+.BR &lt; ,
+.BR &gt; ,
+.BR &quot; ,
+.B &apos;
+and
+.B &nbsp;
+are decoded. There is no rate limit or robots.txt handling; only mirror
+sites you may copy.
 .SH SEE ALSO
 .BR vault (1)
 .SH AUTHOR

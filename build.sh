@@ -73,11 +73,14 @@ out=$(cd -- "$out" && pwd -P)
 case $out in
 / | "$(cd ~ && pwd -P)" | "$root") echo "refusing OUT=$out: use a dedicated directory" >&2; exit 2 ;;
 esac
-rm -f -- "$out"/vault-* "$out"/SHA256SUMS "$out"/*.log
+rm -f -- "$out"/vault-* "$out"/SHA256SUMS
 
 export CARGO_TARGET_DIR_BASE=$root/target/build-sh
 export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$root=vault --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=cargo"
-export OUT_DIR=$out JOBS_N=$jobs HOST_OS=$(uname -s)
+export OUT_DIR=$out JOBS_N=$jobs HOST_OS=$(uname -s) root
+logs=$root/target/build-sh-logs
+mkdir -p -- "$logs"
+export logs
 
 build_one() {
 	local want=$1 row os triple method name ext="" tdir bin
@@ -115,15 +118,14 @@ build_one() {
 	# zig's musl getrandom() never reaches the kernel on riscv64 (it spins);
 	# make the getrandom crate issue the system call itself.
 	[[ $triple == riscv64*-musl ]] && flags+=' --cfg getrandom_backend="linux_raw"'
-	if ! RUSTFLAGS=$flags CARGO_TARGET_DIR=$tdir "${cmd[@]}" --release --locked --target "$triple" >"$OUT_DIR/$name.log" 2>&1; then
+	if ! RUSTFLAGS=$flags CARGO_TARGET_DIR=$tdir "${cmd[@]}" --release --locked --target "$triple" >"$logs/$name.log" 2>&1; then
 		echo "FAILED $want ($triple)" >&2
-		tail -20 "$OUT_DIR/$name.log" >&2
+		tail -20 "$logs/$name.log" >&2
 		return 1
 	fi
 	bin=$tdir/$triple/release/vault$ext
 	[[ $os == wasip1 ]] && bin=$tdir/$triple/release/vault.wasm
 	cp -- "$bin" "$OUT_DIR/$name"
-	rm -f -- "$OUT_DIR/$name.log"
 	if [[ $triple == *-musl* ]] && command -v file >/dev/null; then
 		file -L "$OUT_DIR/$name" | grep -q 'static' || { echo "FAILED $want: not statically linked" >&2; return 1; }
 	fi

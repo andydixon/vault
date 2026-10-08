@@ -1,4 +1,4 @@
-.TH VAULT-ADD 1 "September 2026" "vault" "User Commands"
+.TH VAULT-ADD 1 "October 2026" "vault" "User Commands"
 .SH NAME
 vault-add \- encrypt files, directories or URLs into the vault
 .SH SYNOPSIS
@@ -7,6 +7,10 @@ vault-add \- encrypt files, directories or URLs into the vault
 .IR PATH ]
 .RB [ \-\-vault
 .IR DIR ]
+.RB [ \-\-max\-bytes
+.IR SIZE ]
+.RB [ \-\-timeout
+.IR DURATION ]
 .IR FILE | DIR | URL
 .RI [ FOLDER ]
 .SH DESCRIPTION
@@ -17,7 +21,14 @@ and the key are skipped. A stored name that already exists is replaced.
 .PP
 An \fBhttp://\fR or \fBhttps://\fR \fIURL\fR is downloaded with a Chrome user
 agent and stored under the last element of its final (post-redirect) path, or
-the host name if there is none. Only a 200 response is accepted.
+the host name if there is none. Only a 200 response is accepted. Certificates
+are always verified; at most 10 redirects are followed, to http or https
+only. The download is staged in a private temporary file (it must be
+complete before it can be stored), which is removed afterwards whatever
+happens; it is plaintext on disk meanwhile.
+.PP
+A file that changes while it is being added (it grows, shrinks, or is
+replaced) is not stored, and the command fails.
 .PP
 \fIFOLDER\fR places the result inside a folder in the vault. File contents
 are cut into 4 MiB chunks, the last bucket-padded.
@@ -28,6 +39,14 @@ Key file. Default: $VAULT_KEY, else ~/.vault/key.
 .TP
 .BI \-\-vault " DIR"
 Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.TP
+.BI \-\-max\-bytes " SIZE"
+Largest download accepted, counted after decompression, such as 500M or 50G.
+Default 16G; at most 1T.
+.TP
+.BI \-\-timeout " DURATION"
+Deadline for the whole download, such as 30m. Default 2h. Connecting must
+take under 30 seconds and the response headers must arrive within a minute.
 .SH ENVIRONMENT
 .TP
 .B VAULT_PASSPHRASE

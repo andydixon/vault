@@ -1,4 +1,4 @@
-.TH VAULT-MIGRATE 1 "September 2026" "vault" "User Commands"
+.TH VAULT-MIGRATE 1 "October 2026" "vault" "User Commands"
 .SH NAME
 vault-migrate \- move files into the vault, deleting the originals
 .SH SYNOPSIS
@@ -13,7 +13,10 @@ vault-migrate \- move files into the vault, deleting the originals
 .SH DESCRIPTION
 Works like
 .BR vault\-add (1)
-but deletes each original once it is stored, then any directories left empty.
+but deletes each original once it is stored (and its record is on disk),
+then any directories left empty. An original is deleted only if it is still
+the same file, unchanged, that was stored; otherwise it is kept and the
+command fails.
 Directories still holding skipped files stay. A URL cannot be migrated.
 .PP
 Before storing anything it lists the vault names that would be overwritten and

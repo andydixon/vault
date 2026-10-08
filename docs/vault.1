@@ -1,4 +1,4 @@
-.TH VAULT 1 "September 2026" "vault" "User Commands"
+.TH VAULT 1 "October 2026" "vault" "User Commands"
 .SH NAME
 vault \- post-quantum encrypted file vault
 .SH SYNOPSIS
@@ -77,6 +77,11 @@ Key file. Default: $VAULT_KEY, else ~/.vault/key.
 .TP
 .BI \-\-vault " DIR"
 Vault directory. Default: $VAULT_DIR, else ~/.vault/store.
+.TP
+.BI \-\-workers " N"
+Threads for encryption, decryption and file I/O, 1 to 256. Default: the
+number of CPUs, at most 8. Up to eight 4 MiB objects are in flight at once
+whatever the count.
 .SH ENVIRONMENT
 .TP
 .B VAULT_KEY
@@ -92,6 +97,19 @@ Passphrase, instead of prompting on the terminal or using a key remembered by
 .B VAULT_DECOY_PASSPHRASE
 Decoy passphrase used by
 .BR "vault genkey" .
+.TP
+.BR HTTPS_PROXY ", " HTTP_PROXY ", " NO_PROXY
+Proxies for
+.B add
+.I URL
+and
+.BR mirror ,
+as other programs use them; local addresses are never proxied.
+.TP
+.BR XDG_RUNTIME_DIR ", " TMPDIR
+Where
+.BR vault\-unlock (1)
+keeps its socket, and where downloads are staged.
 .SH LOCKING
 Commands that change the vault hold an exclusive lock on
 .IR DIR/.lock ;
@@ -106,7 +124,10 @@ and
 fills each vault with unreadable filler, so hidden files look like filler to
 anyone holding only the decoy passphrase.
 .SH EXIT STATUS
-0 on success; 1 on error (diagnostics on standard error); 2 when run with no command.
+0 on success; 1 on error (diagnostics on standard error); 2 when run with no
+command; 3 when
+.BR vault\-mirror (1)
+stored some resources but had to skip others.
 .SH EXAMPLES
 .nf
 vault genkey

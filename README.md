@@ -23,16 +23,36 @@ Releases are packaged and published with `packaging/repo.sh [TAG]`.
 
 ## Build
 
+vault is written in Rust (the toolchain is pinned in `rust-toolchain.toml`;
+`rustup` installs it on first use). Releases up to 0.5 were Go; the Go code
+lives on, frozen, in `oracle/go` as the test reference. Nothing at run time
+needs Go.
+
 ```sh
-go build .        # produces ./vault
-go test ./...
-./build.sh        # every OS and CPU architecture, into ./dist
+cargo build --release --locked      # produces target/release/vault
+cargo test --locked                 # unit, CLI and Go-interoperability tests
+./build.sh                          # every target this host can build, into ./dist
+TARGETS="linux/amd64 windows/amd64" ./build.sh
 ```
 
-`build.sh` cross-compiles static binaries for every target in
-`go tool dist list` except iOS and 32-bit or x86 Android, which need cgo. It builds 32-bit ARM Linux for
-both armv6 and armv7, and writes `dist/SHA256SUMS`. Set `TARGETS` to build a
-subset, for example `TARGETS="linux/amd64 darwin/arm64" ./build.sh`.
+`build.sh` cross-compiles with `cargo-zigbuild` and `zig` (Linux, statically
+linked with musl, and Windows), on a Mac for macOS, and with `cross` and
+Docker for the BSDs, illumos and Solaris. It names binaries as before
+(`vault-linux-arm64`, `vault-windows-amd64.exe`, …), builds 32-bit ARM Linux
+for both armv6 and armv7, and writes `dist/SHA256SUMS`. `docs/PLATFORMS.md`
+lists every target, how it is built and tested, and the Go targets Rust
+cannot build.
+
+The interoperability tests build the Go oracle when `go` is installed and
+are skipped (and say so) otherwise; set `VAULT_REQUIRE_ORACLE=1` to make a
+missing oracle an error, as CI does. `oracle/gen-vectors.sh` regenerates the
+Go test vectors. Packages are built and inspected locally, unsigned, with
+`packaging/package.sh`, and published with `packaging/repo.sh [TAG]`.
+
+Further reading: `SECURITY.md` (what is and is not protected, memory and
+filesystem guarantees), `docs/COMPATIBILITY.md` (the formats),
+`docs/MIGRATION.md` (what changed from the Go version) and
+`docs/BENCHMARKS.md`.
 
 ## User guide
 
@@ -82,12 +102,15 @@ vault lock                       # forget it now
 Commands that change the vault take an exclusive lock on `DIR/.lock`, and
 commands that read it take a shared one. A second process waits, and says
 so, until the first finishes. The operating system releases the lock if a
-process dies. Plan 9 and WebAssembly have no file locks, so there the lock
-file itself is the lock. After a crash on those platforms you remove it by
-hand; the error message names it.
+process dies; the locks are the same ones the Go version used, so old and
+new versions exclude each other. WebAssembly (WASI) has no file locks, so
+there the lock file itself is the lock. After a crash there you remove it
+by hand; the error message names it.
 
-Adding a name that already exists replaces it. `get` refuses to overwrite an
-existing file and writes nothing until the whole object has authenticated.
+Adding a name that already exists replaces it. `get` never replaces an
+existing file (or symlink) and writes nothing until the whole file has
+authenticated. `add URL` and `mirror` have size and time limits; see
+`vault(1)`.
 
 `--key PATH` and `--vault DIR` work with every command. They default to
 `$VAULT_KEY` and `$VAULT_DIR`, then to `~/.vault/key` and `~/.vault/store`.
@@ -103,7 +126,8 @@ over a pipe and never touches the disk; the helper's memory is locked
 against swapping, it cannot be core-dumped (or, on Linux, debugged), and it
 answers only on a socket in a directory private to your user. While it is
 unlocked, anything running as you can use the vault, decoy or not, so lock
-before handing the machine over.
+before handing the machine over. If the helper cannot protect its memory it
+refuses the key. `unlock` is not available on Windows.
 
 ## Decoy passphrase
 
