@@ -451,3 +451,53 @@ fn duplicate_records_recover() {
     add_bytes(&s, &mut cat, "f", b"new");
     assert_eq!(s.catalogue().unwrap().records("f").len(), 1, "next write cleans up");
 }
+
+/// Repeated failures mid-pipeline — a source that errors part-way, objects
+/// that fail to authenticate — leave no extra threads behind and return
+/// every buffer (the next large operation still gets all eight).
+#[cfg(target_os = "linux")]
+#[test]
+fn repeated_failures_do_not_leak() {
+    let threads = || std::fs::read_dir("/proc/self/task").unwrap().count();
+    let (d, s) = vault("leak");
+    let mut cat = s.catalogue().unwrap();
+    let body = vec![3u8; 3 * CHUNK_DATA as usize];
+    add_bytes(&s, &mut cat, "f", &body);
+    let r = cat.current("f").unwrap();
+    let obj = s.path(OBJECTS, &r.seed.object_id(1));
+    let good = std::fs::read(&obj).unwrap();
+    let mut bad = good.clone();
+    let n = bad.len() / 2;
+    bad[n] ^= 1;
+    std::fs::write(&obj, &bad).unwrap();
+    struct Failing(usize);
+    impl Read for Failing {
+        fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> {
+            if self.0 == 0 {
+                return Err(std::io::Error::other("source failed"));
+            }
+            let k = b.len().min(self.0);
+            self.0 -= k;
+            b[..k].fill(9);
+            Ok(k)
+        }
+    }
+    let mut other = s.catalogue().unwrap();
+    let before = threads();
+    for i in 0..10 {
+        assert!(get_bytes(&s, r, &d.0, &format!("o{i}")).is_err());
+        let e = s.add_reader(
+            &mut other,
+            &mut Failing(2 * CHUNK_DATA as usize + 5),
+            3 * CHUNK_DATA,
+            0o600,
+            Instant::now(),
+            &name("g"),
+        );
+        assert!(e.is_err());
+    }
+    assert_eq!(threads(), before, "threads accumulated");
+    std::fs::write(&obj, &good).unwrap();
+    assert_eq!(get_bytes(&s, r, &d.0, "ok").unwrap(), body, "buffers were not all returned");
+    assert!(!s.catalogue().unwrap().contains("g"));
+}

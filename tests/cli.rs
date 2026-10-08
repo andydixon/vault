@@ -585,3 +585,55 @@ fn broken_pipe_is_quiet() {
         String::from_utf8_lossy(&o.stderr)
     );
 }
+
+/// A crash part-way through writing (the kernel kills vault with SIGXFSZ
+/// once it passes a file-size limit) leaves the vault consistent: a file
+/// being replaced keeps its old contents, nothing half-written appears, and
+/// migrate deletes no original it had not finished storing.
+#[cfg(target_os = "linux")]
+#[test]
+fn crash_mid_write_keeps_the_vault_consistent() {
+    if Command::new("prlimit").arg("--version").output().is_err() {
+        return common::skip("prlimit not installed");
+    }
+    let e = Env::new("crash");
+    genkey(&e, RUST, false);
+    e.ok(RUST, Some(REAL), &["init"]);
+    e.write("v1/f", b"version one");
+    e.ok(RUST, Some(REAL), &["add", "v1/f"]);
+    let big = pattern(6 << 20, 9);
+    e.write("v2/f", &big);
+    e.write("tree/a", b"a");
+    e.write("tree/b", &big);
+    for args in [vec!["add", "v2/f"], vec!["migrate", "--yes", "tree"]] {
+        // Objects are about 4 MiB; a 2 MiB file-size limit kills vault while
+        // it writes the first one.
+        let o = Command::new("prlimit")
+            .arg("--fsize=2000000")
+            .arg(RUST)
+            .args(&args)
+            .current_dir(&e.dir)
+            .env("VAULT_KEY", e.dir.join("key"))
+            .env("VAULT_DIR", e.dir.join("store"))
+            .env("VAULT_PASSPHRASE", REAL)
+            .output()
+            .unwrap();
+        assert!(!o.status.success(), "{args:?} survived the size limit");
+    }
+    assert_eq!(e.get(RUST, REAL, "f"), b"version one", "replace interrupted, old version lost");
+    let names = e.names(RUST, REAL);
+    assert!(names.iter().all(|n| n == "f" || n == "tree/a"), "half-written entries: {names:?}");
+    assert_eq!(
+        std::fs::read(e.dir.join("tree/b")).unwrap(),
+        big,
+        "original deleted before it was stored"
+    );
+    if names.iter().any(|n| n == "tree/a") {
+        assert_eq!(e.get(RUST, REAL, "tree/a"), b"a");
+    } else {
+        assert!(e.dir.join("tree/a").exists());
+    }
+    // The vault still works normally afterwards.
+    e.ok(RUST, Some(REAL), &["add", "v2/f"]);
+    assert_eq!(e.get(RUST, REAL, "f"), big);
+}

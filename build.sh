@@ -15,7 +15,9 @@
 # How each target is built, and what the host needs:
 #   zig    cargo-zigbuild and zig on PATH  (Linux, Windows GNU ABI)
 #   mac    a Mac with Xcode                (macOS)
-#   cross  `cross` and Docker               (FreeBSD, NetBSD, illumos, Solaris)
+#   cross  `cross` and Docker               (FreeBSD, NetBSD, illumos, Solaris,
+#                                            and big-endian ppc64, which zig
+#                                            links for the wrong ABI)
 #   cargo  nothing extra                    (WASI)
 # A requested target the host cannot build is reported, the others are still
 # built, and the script exits non-zero. See docs/PLATFORMS.md for the Go
@@ -38,7 +40,7 @@ table() {
 	linux/riscv64     riscv64gc-unknown-linux-musl      zig
 	linux/loong64     loongarch64-unknown-linux-musl    zig
 	linux/ppc64le     powerpc64le-unknown-linux-musl    zig
-	linux/ppc64       powerpc64-unknown-linux-gnu       zig
+	linux/ppc64       powerpc64-unknown-linux-gnu       cross
 	linux/s390x       s390x-unknown-linux-gnu           zig
 	android/arm64     aarch64-unknown-linux-musl        zig
 	windows/amd64     x86_64-pc-windows-gnu             zig
