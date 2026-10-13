@@ -54,6 +54,10 @@ impl Env {
         if let Some(p) = pass {
             c.env("VAULT_PASSPHRASE", p);
         }
+        // No console, as Unix tests have no terminal: CI runners have a
+        // hidden one, where a prompt would wait forever.
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut c, 0x0000_0008); // DETACHED_PROCESS
         c
     }
 

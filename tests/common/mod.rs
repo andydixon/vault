@@ -34,7 +34,9 @@ pub fn go_oracle() -> Option<PathBuf> {
         if !have_go() {
             return None;
         }
-        let out = root().join("target").join("vault-go-oracle");
+        let out = root()
+            .join("target")
+            .join(format!("vault-go-oracle{}", std::env::consts::EXE_SUFFIX));
         let st = Command::new("go")
             .args(["build", "-o"])
             .arg(&out)
