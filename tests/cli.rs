@@ -453,20 +453,12 @@ fn agent_rust_client_go_agent() {
 
 #[cfg(unix)]
 fn agent_pids(sock_dir: &Path) -> Vec<u32> {
-    let mut pids = Vec::new();
-    for e in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
-        let Ok(pid) = e.file_name().to_string_lossy().parse::<u32>() else {
-            continue;
-        };
-        let Ok(cmd) = std::fs::read(e.path().join("cmdline")) else {
-            continue;
-        };
-        let cmd = String::from_utf8_lossy(&cmd);
-        if cmd.contains("__agent") && cmd.contains(&*sock_dir.to_string_lossy()) {
-            pids.push(pid);
-        }
-    }
-    pids
+    // pgrep, not /proc: macOS has no /proc.
+    let o = Command::new("pgrep")
+        .args(["-f", &format!("__agent {}", sock_dir.display())])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&o.stdout).lines().filter_map(|l| l.parse().ok()).collect()
 }
 
 #[cfg(target_os = "linux")]
