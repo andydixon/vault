@@ -526,12 +526,13 @@ mod tests {
         );
         assert_eq!(Instant::parse_rfc3339("2023-02-29T00:00:00Z"), None);
         assert!(Instant::parse_rfc3339("2024-02-29T00:00:00Z").is_some());
-        let neg = Instant::from_system(std::time::UNIX_EPOCH - Duration::new(0, 1));
+        // 100 ns: Windows' SystemTime resolution.
+        let neg = Instant::from_system(std::time::UNIX_EPOCH - Duration::new(0, 100));
         assert_eq!(
             neg,
             Instant {
                 secs: -1,
-                nanos: 999_999_999
+                nanos: 999_999_900
             }
         );
         assert_eq!(Instant::from_system(neg.to_system()), neg);

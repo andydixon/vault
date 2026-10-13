@@ -24,7 +24,13 @@ struct Env {
 
 impl Env {
     fn new(tag: &str) -> Env {
-        let dir = std::env::temp_dir().join(format!(
+        // Not temp_dir(): macOS's long $TMPDIR pushes the agent socket path
+        // past SUN_LEN.
+        #[cfg(unix)]
+        let base = PathBuf::from("/tmp");
+        #[cfg(not(unix))]
+        let base = std::env::temp_dir();
+        let dir = base.join(format!(
             "vault-cli-{tag}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
