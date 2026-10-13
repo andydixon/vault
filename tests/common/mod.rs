@@ -31,7 +31,9 @@ pub fn go_oracle() -> Option<PathBuf> {
         if let Some(p) = std::env::var_os("VAULT_GO_ORACLE") {
             return Some(PathBuf::from(p));
         }
-        if !have_go() {
+        // The frozen Go version cannot sync directories on Windows ("Access
+        // is denied"), so its vaults cannot be shared there.
+        if cfg!(windows) || !have_go() {
             return None;
         }
         let out = root()

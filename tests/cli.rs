@@ -162,7 +162,7 @@ fn rust_lifecycle() {
 #[test]
 fn go_made_rust_used() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     lifecycle(go.to_str().unwrap(), RUST);
 }
@@ -170,7 +170,7 @@ fn go_made_rust_used() {
 #[test]
 fn rust_made_go_used() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     lifecycle(RUST, go.to_str().unwrap());
 }
@@ -179,7 +179,7 @@ fn rust_made_go_used() {
 #[test]
 fn boundary_sizes_interop() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     let go = go.to_str().unwrap();
     let e = Env::new("bounds");
@@ -392,7 +392,7 @@ fn lock_contention(holder: &str, waiter: &str) {
 #[test]
 fn lock_rust_waits_for_go() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     lock_contention(go.to_str().unwrap(), RUST);
 }
@@ -401,7 +401,7 @@ fn lock_rust_waits_for_go() {
 #[test]
 fn lock_go_waits_for_rust() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     lock_contention(RUST, go.to_str().unwrap());
 }
@@ -441,7 +441,7 @@ fn agent_rust() {
 #[test]
 fn agent_go_client_rust_agent() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     agent_roundtrip(RUST, go.to_str().unwrap());
 }
@@ -450,7 +450,7 @@ fn agent_go_client_rust_agent() {
 #[test]
 fn agent_rust_client_go_agent() {
     let Some(go) = common::go_oracle() else {
-        return common::skip("go not installed");
+        return common::skip("no Go oracle");
     };
     agent_roundtrip(go.to_str().unwrap(), RUST);
 }
