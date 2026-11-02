@@ -183,7 +183,6 @@ single time. Also, all the cool names were taken.
 \begin{tldr}
 Download the one file for your system, check its SHA-256, rename it to
 \cmd{vault} (or \cmd{vault.exe}), and put it somewhere on your \env{PATH}.
-Or build every platform yourself with \cmd{./build.sh}.
 \end{tldr}
 
 \section{The easy way on Linux: my package repository}
@@ -299,38 +298,11 @@ Run \cmd{vault help}. You should see the full command list:
 
 \shot[0.95]{help}{\cmd{vault help}: everything vault can do, on one screen}
 
-\section{Building it yourself}
-
-Prefer to build from source? You need Rust, through \cmd{rustup}, which
-fetches the exact compiler version the project pins. Then:
-
-\begin{shell}
-$ cargo build --release --locked   # just your platform: target/release/vault
-$ ./build.sh                       # every platform it can, into ./dist, with SHA256SUMS
-\end{shell}
-
-\cmd{build.sh} cross-compiles Linux and Windows with \cmd{cargo-zigbuild}
-and \cmd{zig}, macOS on a Mac, and FreeBSD with \cmd{cross} and Docker; it says which targets your machine can't build.
-32-bit ARM Linux gets two builds, armv6 and armv7. Want just a few? Set
-\env{TARGETS}. Want them somewhere else? Set \env{OUT}.
-
-\shot{build}{A partial build, followed by checking every binary against SHA256SUMS}
-
-\begin{whyso}
-The Linux binaries are \emph{static}: they need no system libraries at all.
-Every build uses the pinned compiler and the locked versions of every
-dependency, with build paths stripped, so the result doesn't depend on whose
-machine or which folder built it. Built with the same compiler for the same
-target, the same commit should give the same file, so you can check a
-release against your own build.
-\end{whyso}
-
 \begin{pocket}
 \begin{pocketlist}
   \item One file per platform. Rename it \cmd{vault} and put it on your \env{PATH}.
   \item Always check the SHA-256 against \file{SHA256SUMS}.
   \item macOS: clear the quarantine flag after checking.
-  \item \cmd{./build.sh} builds every platform your machine can, from source.
 \end{pocketlist}
 \end{pocket}
 
@@ -1460,21 +1432,6 @@ Exit codes & 0 ok, 1 error, 2 no command \\
   \item[Record] The encrypted catalogue entry for one file: its name, size, dates and the seed its objects' names come from.
   \item[Vault] The folder where your encrypted files live.
 \end{description}
-
-\chapter{About this guide}
-
-This guide lives in \file{docs/guide} and builds itself.
-
-\begin{shell}
-$ ./build-pdf.sh    # makes vault-guide.pdf (downloads Tectonic if needed)
-$ ./shots.py        # re-shoots every screenshot from the real vault binary
-\end{shell}
-
-Every screenshot is real output from the \cmd{vault} program built from the
-same source code, run in a throwaway home folder. The only touch-ups: the home
-folder is shown as \file{/home/sam}, some lines are highlighted in amber
-so they're easier to spot, and the two ``waiting for your passphrase'' shots
-are frozen at that moment.
 
 % ======================================================================
 \backmatter
